@@ -1,0 +1,3 @@
+Company Name: Proxify AB
+Job Title: Senior Data Scientist (Graph & Neo4j)
+More Info: https://weworkremotely.com/company/proxify-ab
