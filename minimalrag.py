@@ -7,7 +7,7 @@ from langchain_core.documents import Document
 
 # Reuse your existing loader & embeddings
 from load_documents import load_articles
-from myembeddings import embeddings   # ← your BAAI/bge-small-en-v1.5 instance
+from create_embeddings_and_fiass import embeddings   # ← your BAAI/bge-small-en-v1.5 instance
 
 # ─── Option A: Load fresh documents from DB (good for testing) ───
 print("Loading articles from SQLite...")

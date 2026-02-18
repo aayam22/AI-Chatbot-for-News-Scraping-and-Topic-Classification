@@ -1,29 +1,39 @@
+"""
+Check DB & View Articles
+Combines checkdb.py + view.py
+"""
+
 import sqlite3
 from datetime import datetime
 
-DB_FILE = r"D:\rag\AI-Chatbot-for-News-Scraping-and-Topic-Classification\npr_news.db"
+DB_FILE = "npr_news.db"
 
-def print_articles(limit=20, order_by="DESC"):
+# --- Step 1: Check Database ---
+try:
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT COUNT(*) FROM articles")
+    count = cursor.fetchone()[0]
+    
+    print(f"Database connected successfully!")
+    print(f"Number of rows in 'articles' table: {count}")
+    
+    # Column names
+    cursor.execute("PRAGMA table_info(articles)")
+    columns = [col[1] for col in cursor.fetchall()]
+    print("Columns:", ", ".join(columns))
+    
+except Exception as e:
+    print("Error:", e)
+    exit(1)
+
+# --- Step 2: View first N articles ---
+def print_articles(limit=12, order_by="DESC"):
     try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT COUNT(*) FROM articles")
-        total = cursor.fetchone()[0]
-
-        if total == 0:
-            print("No articles found in the database yet.")
-            return
-
-        # Check available columns to handle different schema versions
-        cursor.execute("PRAGMA table_info(articles)")
-        columns = {col[1] for col in cursor.fetchall()}
-
         has_scraped_at = 'scraped_at' in columns
+        print(f"\nShowing up to {limit} of {count} articles (newest first)\n")
 
-        print(f"Showing up to {limit} of {total} articles (newest first)\n")
-
-        # Build query dynamically based on available columns
         select_fields = [
             "id",
             "title",
@@ -65,7 +75,7 @@ def print_articles(limit=20, order_by="DESC"):
                         print(f"Date     : {scraped[:16]}")
                 else:
                     print("Date     : —")
-                idx += 1  # only increment if we consumed the field
+                idx += 1
 
             print(f"Title    : {title}")
             print(f"Link     : {link}")
@@ -80,15 +90,9 @@ def print_articles(limit=20, order_by="DESC"):
             print(f"Text prev: {preview if preview else '(no text extracted)'}")
             print("─" * 100)
 
-        conn.close()
-
-    except sqlite3.OperationalError as e:
-        if "no such table" in str(e).lower():
-            print("Table 'articles' does not exist yet. Run the scraper first.")
-        else:
-            print(f"Database error: {e}")
     except Exception as e:
         print(f"Error: {e}")
 
-if __name__ == "__main__":
-    print_articles(limit=12)
+# Run viewer
+print_articles(limit=12)
+conn.close()
