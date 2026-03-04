@@ -21,7 +21,7 @@ print("Embedding vector length:", len(vector))
 print("First 8 values:", vector[:8])
 
 # --- Step 2: Load articles ---
-documents = load_articles(limit=90)
+documents = load_articles(limit=200)
 print(f"\nLoaded {len(documents)} articles. Creating FAISS index...")
 
 # --- Step 3: Create FAISS index ---

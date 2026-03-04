@@ -2,7 +2,7 @@
 import sqlite3
 from langchain_core.documents import Document
 
-DB_PATH = "npr_news.db"
+DB_PATH = "global_news.db"
 
 def load_articles(limit=100):
     conn = sqlite3.connect(DB_PATH)

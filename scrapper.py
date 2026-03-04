@@ -2,37 +2,37 @@ import requests
 from bs4 import BeautifulSoup
 import sqlite3
 import time
-import re
 import random
 from urllib.parse import urljoin
-from tqdm import tqdm  # pip install tqdm
+from googletrans import Translator
+from tqdm import tqdm  # progress bar
 
-# --- Config ---
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                  '(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
-}
+headers = {"User-Agent": "Mozilla/5.0"}
+DB_FILE = "global_news.db"
 
-BASE_URL = "https://www.npr.org"
-DB_FILE = "npr_news.db"
-
-SECTIONS = [
-    "/sections/news/",
-    "/sections/world/",
-    "/sections/climate/",
-    "/sections/environment/",
-    "/sections/politics/",
-    "/sections/national/",
-    # Add more sections here if desired
+BBC_RSS = [
+    "https://feeds.bbci.co.uk/news/rss.xml",
+    "https://feeds.bbci.co.uk/news/world/rss.xml",
 ]
 
-# --- Database setup ---
+NPR_SECTIONS = [
+    "https://www.npr.org/sections/news/",
+    "https://www.npr.org/sections/world/",
+]
+
+EKANTIPUR_HOME = "https://ekantipur.com/"
+
+translator = Translator()
+
+# ---------------- DATABASE ----------------
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS articles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source TEXT,
+            category TEXT,
             title TEXT,
             link TEXT UNIQUE,
             teaser TEXT,
@@ -40,153 +40,148 @@ def init_db():
             full_text TEXT,
             scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    ''')
+    """)
     conn.commit()
     return conn, cursor
 
-# --- Extract article links ---
-def get_article_links_from_page(url):
-    try:
-        response = requests.get(url, headers=headers, timeout=12)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
+# ---------------- Helper ----------------
+def translate_text(text, dest='en', chunk_size=500):
+    translated = []
+    for i in range(0, len(text), chunk_size):
+        part = text[i:i+chunk_size]
+        try:
+            translated.append(translator.translate(part, dest=dest).text)
+        except:
+            translated.append(part)
+    return " ".join(translated)
 
-        links = set()
-        for a in soup.find_all('a', href=True):
-            href = a['href']
-            if re.search(r'/\d{4}/\d{2}/\d{2}/[a-z0-9-]+', href):
-                full_url = urljoin(BASE_URL, href)
-                if 'npr.org' in full_url and '/player/' not in full_url and not full_url.endswith('/'):
-                    links.add(full_url)
-        return links
-    except Exception as e:
-        print(f"Failed to fetch {url}: {e}")
-        return set()
+# ---------------- BBC ----------------
+def scrape_bbc(cursor, max_articles=100):
+    for rss in BBC_RSS:
+        r = requests.get(rss, headers=headers)
+        soup = BeautifulSoup(r.content, "xml")
+        items = soup.find_all("item")[:max_articles]
 
-def collect_article_links(max_pages_per_section=5):
-    all_links = set()
-    for section in SECTIONS:
-        print(f"→ Crawling section: {section}")
-        current_url = urljoin(BASE_URL, section)
-        page_count = 0
+        for item in tqdm(items, desc="BBC articles", unit="article"):
+            link = item.link.text
+            title = item.title.text
+            teaser = item.description.text if item.description else ""
 
-        while current_url and page_count < max_pages_per_section:
-            page_links = get_article_links_from_page(current_url)
-            new_count = len(page_links - all_links)
-            all_links.update(page_links)
-            print(f"  Page {page_count+1}: found {len(page_links)} links ({new_count} new)")
-
-            # Find next page link
             try:
-                soup = BeautifulSoup(requests.get(current_url, headers=headers, timeout=5).text, 'html.parser')
-                next_link = soup.find('a', text=re.compile(r'(Older|More|Next|Load More|→)', re.I))
-                if next_link:
-                    current_url = urljoin(BASE_URL, next_link['href'])
-                else:
-                    page_count += 1
-                    next_page_num = page_count + 1
-                    current_url = f"{current_url.rstrip('/')}?page={next_page_num}"
-                    if requests.get(current_url, headers=headers, timeout=5).status_code != 200:
-                        current_url = None
+                art_r = requests.get(link, headers=headers, timeout=10)
+                art_soup = BeautifulSoup(art_r.text, "html.parser")
+                paragraphs = art_soup.select("article p")
+                full_text = " ".join(p.get_text(strip=True) for p in paragraphs)
+                img_tag = art_soup.find("meta", property="og:image")
+                image_url = img_tag["content"] if img_tag else None
             except:
-                current_url = None
+                full_text = ""
+                image_url = None
 
-            page_count += 1
-            # Polite delay between pages
-            time.sleep(max(0, 0.3 + random.uniform(0, 0.2)))
+            cursor.execute("""
+                INSERT OR IGNORE INTO articles 
+                (source, category, title, link, teaser, image_url, full_text)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                ("BBC", "General", title, link, teaser, image_url, full_text)
+            )
+            time.sleep(random.uniform(0.3, 0.8))
 
-    return sorted(list(all_links))
+# ---------------- NPR ----------------
+def scrape_npr(cursor, max_articles=100):
+    for section in NPR_SECTIONS:
+        r = requests.get(section, headers=headers)
+        soup = BeautifulSoup(r.text, "html.parser")
+        links = []
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            if "/2026/" in href and len(a.get_text(strip=True)) > 20:
+                links.append((href, a.get_text(strip=True)))
 
-# --- Extract full article text ---
-def extract_article_text(soup):
-    full_text_parts = []
-
-    containers = [
-        soup.find('div', class_='storytext'),
-        soup.find('div', class_='body-container'),
-        soup.find('article'),
-        soup.find('div', {'id': re.compile(r'(main|content|story|article-body)')}),
-    ]
-
-    for container in filter(None, containers):
-        paragraphs = container.find_all(['p', 'li', 'h2', 'h3'], recursive=True)
-        for elem in paragraphs:
-            text = elem.get_text(strip=True)
-            if text and len(text) > 25 and not any(x in text.lower() for x in ['listen ·', 'support npr', 'copyright ©', 'npr thanks our sponsors']):
-                full_text_parts.append(text)
-
-    if not full_text_parts:
-        for p in soup.find_all('p'):
-            text = p.get_text(strip=True)
-            if 30 < len(text) < 900 and 'http' not in text and len(text.split()) > 8:
-                full_text_parts.append(text)
-
-    return ' '.join(full_text_parts) if full_text_parts else ''
-
-# --- Main scraping ---
-def main(max_articles=400, sleep_sec=0.1):
-    conn, cursor = init_db()
-    
-    print("Collecting article links from multiple sections...")
-    links = collect_article_links(max_pages_per_section=6)
-    print(f"\nTotal unique candidate links found: {len(links)}")
-
-    links = links[:max_articles]
-    new_count = 0
-    skipped = 0
-
-    for i, link in enumerate(tqdm(links, desc="Scraping articles"), 1):
-        cursor.execute("SELECT 1 FROM articles WHERE link = ?", (link,))
-        if cursor.fetchone():
-            skipped += 1
-            continue
-
-        print(f"[{i}/{len(links)}]  {link}")
-
-        for attempt in range(3):
+        for href, title in tqdm(links[:max_articles], desc="NPR articles", unit="article"):
+            full_link = urljoin("https://www.npr.org", href)
             try:
-                resp = requests.get(link, headers=headers, timeout=12)
-                resp.raise_for_status()
-                soup = BeautifulSoup(resp.text, 'html.parser')
+                art_r = requests.get(full_link, headers=headers, timeout=10)
+                art_soup = BeautifulSoup(art_r.text, "html.parser")
+                paragraphs = art_soup.select("div[itemprop='articleBody'] p")
+                full_text = " ".join(p.get_text(strip=True) for p in paragraphs)
+                teaser = paragraphs[0].get_text(strip=True) if paragraphs else ""
+                img_tag = art_soup.find("meta", property="og:image")
+                image_url = img_tag["content"] if img_tag else None
+            except:
+                full_text = ""
+                teaser = ""
+                image_url = None
 
-                title_tag = soup.find('meta', property='og:title')
-                title = title_tag['content'] if title_tag else soup.find('h1').get_text(strip=True) if soup.find('h1') else '[No title]'
+            cursor.execute("""
+                INSERT OR IGNORE INTO articles 
+                (source, category, title, link, teaser, image_url, full_text)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                ("NPR", "General", title, full_link, teaser, image_url, full_text)
+            )
+            time.sleep(random.uniform(0.3, 0.8))
 
-                teaser_tag = soup.find('meta', property='og:description')
-                teaser = teaser_tag['content'] if teaser_tag else ''
+# ---------------- eKantipur ----------------
+def scrape_ekantipur(cursor, max_articles=100):
+    r = requests.get(EKANTIPUR_HOME, headers=headers)
+    soup = BeautifulSoup(r.text, "html.parser")
+    links = set()
+    for a in soup.select('a[href*="/2026/"]'):
+        href = a.get("href")
+        if href and not href.startswith("http"):
+            href = urljoin(EKANTIPUR_HOME, href)
+        links.add(href)
 
-                image_tag = soup.find('meta', property='og:image')
-                image_url = image_tag['content'] if image_tag else ''
+    for link in tqdm(list(links)[:max_articles], desc="eKantipur articles", unit="article"):
+        try:
+            art_r = requests.get(link, headers=headers, timeout=10)
+            art_soup = BeautifulSoup(art_r.text, "html.parser")
 
-                full_text = extract_article_text(soup)
+            # Extract paragraphs using multiple selectors
+            paragraphs = (
+                art_soup.select("div.detail p") or
+                art_soup.select("article p") or
+                art_soup.select(".article-detail p") or
+                art_soup.select("div.news-content p") or
+                art_soup.select("div#article-body p") or
+                art_soup.find_all("p")
+            )
+            full_text = " ".join(p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True))
+            teaser = paragraphs[0].get_text(strip=True) if paragraphs else ""
 
-                cursor.execute('''
-                    INSERT OR IGNORE INTO articles
-                    (title, link, teaser, image_url, full_text)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (title, link, teaser, image_url, full_text))
+            # Extract title from h1 or URL
+            title_np = art_soup.find("h1")
+            title_np = title_np.get_text(strip=True) if title_np else link.split("/")[-1].replace("-", " ")
+            title_en = translate_text(title_np)
 
-                if cursor.rowcount > 0:
-                    new_count += 1
-                    print(f"   → Stored: {title[:80]}{'...' if len(title)>80 else ''}")
+            # Translate full text
+            translated_text = translate_text(full_text) if full_text else ""
 
-                break  # success
+            # Extract image
+            img_tag = art_soup.find("meta", property="og:image")
+            image_url = img_tag["content"] if img_tag else None
 
-            except Exception as e:
-                print(f"   → Error (attempt {attempt+1}): {type(e).__name__} {e}")
-                if attempt < 2:
-                    time.sleep(1 + random.random()*2)
-                else:
-                    print(f"   → Giving up on {link}")
+            cursor.execute("""
+                INSERT OR IGNORE INTO articles 
+                (source, category, title, link, teaser, image_url, full_text)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                ("eKantipur", "Nepal", title_en, link, teaser, image_url, translated_text)
+            )
+            time.sleep(random.uniform(0.3, 0.8))
+        except Exception as e:
+            print(f"Failed to scrape {link}: {e}")
 
-        # Safe jittered sleep
-        sleep_time = max(0, sleep_sec + random.uniform(-0.05, 0.15))
-        time.sleep(sleep_time)
-
+# ---------------- MAIN ----------------
+def main():
+    conn, cursor = init_db()
+    print("Scraping BBC...")
+    scrape_bbc(cursor, max_articles=100)
+    print("Scraping NPR...")
+    scrape_npr(cursor, max_articles=100)
+    print("Scraping eKantipur...")
+    scrape_ekantipur(cursor, max_articles=100)
     conn.commit()
     conn.close()
-    print(f"\nDone. Added {new_count} new articles. Skipped {skipped} already existing.")
+    print("Done. Unified news database updated with latest articles.")
 
-# --- Run ---
 if __name__ == "__main__":
-    main(max_articles=400, sleep_sec=0.1)
+    main()
