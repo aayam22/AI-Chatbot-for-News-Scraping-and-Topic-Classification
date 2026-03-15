@@ -6,7 +6,7 @@ Improved viewer for global_news.db with cleaned titles and text previews
 import sqlite3
 from datetime import datetime
 
-DB_FILE = "global_news.db"
+DB_FILE = "india_news.db"  # Change to "global_news.db" if needed
 
 # --- Step 1: Connect to Database ---
 try:
