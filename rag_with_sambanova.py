@@ -8,7 +8,7 @@ from sambanova import SambaNova
 print("Loading FAISS index...")
 
 vectorstore = FAISS.load_local(
-    "./faiss_npr_minimal",
+    "./faiss_npr_test",
     embeddings,
     allow_dangerous_deserialization=True
 )
