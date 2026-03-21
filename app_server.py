@@ -1,24 +1,37 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 import threading
-import time
 
-# FastAPI app
+# --- FastAPI app ---
 app = FastAPI(title="News RAG API")
+
+# --- CORS setup (required for React frontend) ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # allow all origins for development
+    allow_credentials=True,
+    allow_methods=["*"],   # allow GET, POST, OPTIONS, etc.
+    allow_headers=["*"],
+)
 
 # --- Request schema ---
 class QueryRequest(BaseModel):
     question: str
 
-# --- Globals for FAISS/SambaNova ---
+# --- Globals ---
 vectorstore = None
 retriever = None
 client = None
-services_ready = False  # Flag to check if services are initialized
+services_ready = False
 
 # --- Placeholder response ---
 def placeholder_answer(question: str):
-    return {"answer": f"You asked: {question}", "sources": [], "status": "placeholder"}
+    return {
+        "answer": f"You asked: {question} (placeholder because services not ready)",
+        "sources": [],
+        "status": "placeholder"
+    }
 
 # --- Initialize FAISS and SambaNova ---
 def init_services():
@@ -50,24 +63,22 @@ def init_services():
         print(f"⚠️ Initialization failed: {e}")
         services_ready = False
 
-# Run initialization in a separate thread so server starts instantly
 threading.Thread(target=init_services, daemon=True).start()
 
 # --- RAG logic ---
 def generate_answer(query: str):
     global retriever, client, services_ready
+
     if not services_ready or not retriever or not client:
         return placeholder_answer(query)
 
-    # Retrieve documents
-    docs = retriever.invoke(query)
-
-    context = "\n\n".join([
-        f"Title: {doc.metadata.get('title','N/A')}\nContent: {doc.page_content[:600]}"
-        for doc in docs
-    ])
-
-    prompt = f"""
+    try:
+        docs = retriever.invoke(query)
+        context = "\n\n".join([
+            f"Title: {doc.metadata.get('title','N/A')}\nContent: {doc.page_content[:600]}"
+            for doc in docs
+        ])
+        prompt = f"""
 Answer the question using ONLY the news articles below.
 
 ARTICLES:
@@ -78,23 +89,25 @@ QUESTION:
 
 ANSWER:
 """
-    response = client.chat.completions.create(
-        model="Meta-Llama-3.1-8B-Instruct",
-        messages=[
-            {"role": "system", "content": "Answer questions using only the provided news articles."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.2,
-    )
+        response = client.chat.completions.create(
+            model="Meta-Llama-3.1-8B-Instruct",
+            messages=[
+                {"role": "system", "content": "Answer questions using only the provided news articles."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2,
+        )
 
-    return {
-        "answer": response.choices[0].message.content,
-        "sources": [
-            {"title": doc.metadata.get("title",""), "link": doc.metadata.get("source","")}
-            for doc in docs
-        ],
-        "status": "real"
-    }
+        return {
+            "answer": response.choices[0].message.content,
+            "sources": [
+                {"title": doc.metadata.get("title",""), "link": doc.metadata.get("source","")}
+                for doc in docs
+            ],
+            "status": "real"
+        }
+    except Exception as e:
+        return {"answer": f"Error generating answer: {e}", "sources": [], "status": "error"}
 
 # --- API endpoints ---
 @app.get("/")
@@ -103,7 +116,4 @@ def home():
 
 @app.post("/ask")
 def ask_question(request: QueryRequest):
-    try:
-        return generate_answer(request.question)
-    except Exception as e:
-        return {"error": str(e)}
+    return generate_answer(request.question)
