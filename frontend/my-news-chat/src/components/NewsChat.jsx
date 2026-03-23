@@ -1,124 +1,166 @@
-import { useState } from 'react'
-import axios from 'axios'
+import { useState, useRef, useEffect } from 'react';
+import axios from 'axios';
+
+const BACKEND_URL = 'http://127.0.0.1:8000';
 
 export default function NewsChat() {
-  const [question, setQuestion] = useState('')
-  const [answerData, setAnswerData] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [messages, setMessages] = useState([]);
+  const [question, setQuestion] = useState('');
+  const [loading, setLoading] = useState(false);
+  const chatEndRef = useRef(null);
 
-  // --- Test backend connection ---
-  const testBackend = async () => {
-    try {
-      const res = await axios.get('http://127.0.0.1:8000/')
-      alert(`Backend status: ${res.data.message}\nServices ready: ${res.data.services_ready}`)
-    } catch (err) {
-      alert('Cannot reach backend → ' + err.message)
-    }
-  }
+  // Auto-scroll on new message
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-  // --- Send question ---
   const sendQuestion = async () => {
-    if (!question) return
-    setLoading(true)
-    setError('')
-    setAnswerData(null)
+    if (!question.trim()) return;
+
+    const userMsg = { role: 'user', text: question };
+    setMessages((prev) => [...prev, userMsg]);
+    setQuestion('');
+    setLoading(true);
 
     try {
-      const res = await axios.post('http://127.0.0.1:8000/ask', { question })
-      setAnswerData(res.data)
+      const res = await axios.post(`${BACKEND_URL}/ask`, { question: userMsg.text });
+      const data = res.data;
+      const assistantMsg = { role: 'assistant', text: data.answer };
+      setMessages((prev) => [...prev, assistantMsg]);
     } catch (err) {
-      console.error(err)
-      setError('Error sending question → ' + err.message)
+      setMessages((prev) => [...prev, { role: 'assistant', text: '❌ Error: ' + err.message }]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
+
+  const clearMemory = async () => {
+    setLoading(true);
+    try {
+      await axios.post(`${BACKEND_URL}/clear-memory`);
+      setMessages([{ role: 'assistant', text: '🗑 Memory cleared!' }]);
+    } catch (err) {
+      setMessages((prev) => [...prev, { role: 'assistant', text: '❌ Error clearing memory: ' + err.message }]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div style={{ maxWidth: '700px', margin: '40px auto', fontFamily: 'system-ui, sans-serif' }}>
-      <h1 style={{ textAlign: 'center', color: '#1e40af' }}>News Chat – Test Version</h1>
+    <div style={{
+      maxWidth: '700px',
+      margin: '40px auto',
+      fontFamily: 'Courier New, monospace',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '12px'
+    }}>
+      <h1 style={{
+        textAlign: 'center',
+        border: '2px solid #000',
+        display: 'inline-block',
+        padding: '8px 12px',
+        marginBottom: '20px',
+        boxShadow: '2px 2px 0px #000'
+      }}>
+        AI NEWS CHATBOT
+      </h1>
 
-      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-        <button
-          onClick={testBackend}
-          style={{
-            padding: '10px 24px',
-            fontSize: '16px',
-            background: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-          }}
-        >
-          Test Backend
-        </button>
+      <div style={{
+        flex: 1,
+        border: '1px solid #ccc',
+        borderRadius: '8px',
+        padding: '12px',
+        height: '400px',
+        overflowY: 'auto',
+        background: '#fefefe',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+      }}>
+        {messages.map((m, i) => (
+          <div key={i} style={{
+            alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+            maxWidth: '80%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px'
+          }}>
+            {m.role === 'user' ? (
+              <div style={{
+                background: '#000',
+                color: '#fff',
+                padding: '10px 14px',
+                borderRadius: '12px 12px 4px 12px',
+                boxShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+                fontSize: '14px'
+              }}>
+                [USER MESSAGE]<br />{m.text}
+              </div>
+            ) : (
+              <div style={{
+                background: '#fff',
+                border: '1px solid #000',
+                padding: '10px 14px',
+                borderRadius: '12px 12px 12px 4px',
+                boxShadow: '2px 2px 4px rgba(0,0,0,0.1)',
+                fontSize: '14px'
+              }}>
+                [AI RESPONSE]<br />{m.text}
+              </div>
+            )}
+          </div>
+        ))}
+        <div ref={chatEndRef} />
       </div>
 
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', gap: '8px' }}>
         <input
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Type your question here..."
-          style={{ flex: 1, padding: '10px', fontSize: '16px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+          style={{
+            flex: 1,
+            padding: '10px',
+            borderRadius: '8px',
+            border: '1px solid #ccc',
+            fontFamily: 'Courier New, monospace'
+          }}
           disabled={loading}
+          onKeyDown={(e) => { if (e.key === 'Enter') sendQuestion(); }}
         />
         <button
           onClick={sendQuestion}
           disabled={loading}
           style={{
             padding: '10px 20px',
-            fontSize: '16px',
-            background: '#10b981',
-            color: 'white',
+            background: '#000',
+            color: '#fff',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '8px',
             cursor: 'pointer',
+            boxShadow: '2px 2px 0px #000'
           }}
         >
-          {loading ? 'Sending...' : 'Ask'}
+          SEND
+        </button>
+        <button
+          onClick={clearMemory}
+          disabled={loading}
+          style={{
+            padding: '10px 20px',
+            background: '#e11d48',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            boxShadow: '2px 2px 0px #b91c1c'
+          }}
+        >
+          CLEAR
         </button>
       </div>
-
-      {/* --- Display Answer --- */}
-      <div
-        style={{
-          padding: '20px',
-          background: '#f1f5f9',
-          borderRadius: '12px',
-          minHeight: '120px',
-          whiteSpace: 'pre-wrap',
-        }}
-      >
-        {error && <span style={{ color: 'red' }}>{error}</span>}
-        {!error && !answerData && 'Your answer will appear here...'}
-        {answerData && (
-          <div>
-            <strong>Answer:</strong>
-            <p>{answerData.answer}</p>
-
-            {answerData.sources && answerData.sources.length > 0 && (
-              <>
-                <strong>Sources:</strong>
-                <ul>
-                  {answerData.sources.map((src, idx) => (
-                    <li key={idx}>
-                      {src.title} {src.link && <a href={src.link} target="_blank" rel="noopener noreferrer">(link)</a>}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            <em>Status: {answerData.status}</em>
-          </div>
-        )}
-      </div>
-
-      <p style={{ marginTop: '40px', textAlign: 'center', color: '#6b7280', fontSize: '14px' }}>
-        React + Vite frontend. Make sure your FastAPI backend is running on port 8000.
-      </p>
     </div>
-  )
+  );
 }

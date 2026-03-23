@@ -1,40 +1,45 @@
-from langchain_community.vectorstores import FAISS
-from create_embeddings_and_fiass import embeddings
-from sambanova import SambaNova
+# rag_with_sambanova.py
+import os
 import re
+from langchain_community.vectorstores import FAISS
+from sambanova import SambaNova
+from create_embeddings_and_fiass import embeddings
 
-# ───────────────────────────────
-# Load FAISS index
-# ───────────────────────────────
-print("Loading FAISS index...")
-vectorstore = FAISS.load_local(
-    "./faiss_npr_test",
-    embeddings,
-    allow_dangerous_deserialization=True
-)
-print("✓ FAISS index loaded successfully.\n")
+# -----------------------------
+# GLOBALS
+# -----------------------------
+vectorstore = None
+client = None
+chat_history = []   # ✅ basic memory
 
-# ───────────────────────────────
-# Initialize SambaNova client
-# ───────────────────────────────
-client = SambaNova(
-    api_key="6bdd58a3-792a-40fb-af59-9abbc3ca6e4a",
-    base_url="https://api.sambanova.ai/v1",
-)
-
-# ───────────────────────────────
-# Chat memory
-# ───────────────────────────────
-chat_history = []
-
-# ───────────────────────────────
-# Known categories
-# ───────────────────────────────
 CATEGORIES = ["Politics", "Technology", "Sports", "Business", "Health", "Entertainment", "World", "Science"]
 
-# ───────────────────────────────
-# Detect category in user query
-# ───────────────────────────────
+# -----------------------------
+# INIT FUNCTION
+# -----------------------------
+def init_rag():
+    global vectorstore, client
+
+    print("🔄 Initializing RAG system...")
+
+    # Load FAISS index
+    vectorstore = FAISS.load_local(
+        "./faiss_npr_test",
+        embeddings,
+        allow_dangerous_deserialization=True
+    )
+
+    client = SambaNova(
+        api_key="6bdd58a3-792a-40fb-af59-9abbc3ca6e4a",
+        base_url="https://api.sambanova.ai/v1",
+    )
+
+
+    print("✅ RAG ready!")
+
+# -----------------------------
+# CATEGORY DETECTION
+# -----------------------------
 def detect_category(query: str):
     query_lower = query.lower()
     for cat in CATEGORIES:
@@ -42,15 +47,46 @@ def detect_category(query: str):
             return cat
     return None
 
-# ───────────────────────────────
-# RAG response function
-# ───────────────────────────────
-def generate_qa_response(query: str, max_article_chars=500):
+# -----------------------------
+# BUILD MESSAGES WITH MEMORY
+# -----------------------------
+def build_messages(query, context):
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a news assistant. Answer ONLY using provided articles. Cite sources clearly."
+        }
+    ]
+
+    # ✅ last 3 conversations
+    for chat in chat_history[-3:]:
+        messages.append({"role": "user", "content": chat["user"]})
+        messages.append({"role": "assistant", "content": chat["assistant"]})
+
+    # current query
+    messages.append({
+        "role": "user",
+        "content": f"ARTICLES:\n{context}\n\nQUESTION: {query}"
+    })
+
+    return messages
+
+# -----------------------------
+# MAIN RAG FUNCTION
+# -----------------------------
+def query_rag(query: str, max_chars=700):
+    global vectorstore, client, chat_history
+
+    if not vectorstore or not client:
+        return {
+            "answer": "⚠️ RAG system not initialized",
+            "sources": []
+        }
+
     try:
-        # Check if user asked about a specific category
+        # Category filtering
         category = detect_category(query)
 
-        # Create retriever; filter by category if needed
         if category:
             retriever = vectorstore.as_retriever(
                 search_type="mmr",
@@ -62,76 +98,63 @@ def generate_qa_response(query: str, max_article_chars=500):
                 search_kwargs={"k": 5}
             )
 
-        # Retrieve relevant docs
-        relevant_docs = retriever.invoke(query)
-        if not relevant_docs:
-            return "⚠️ No relevant articles found.", []
+        docs = retriever.invoke(query)
 
-        # Prepare context: use first N chars per article
+        if not docs:
+            return {
+                "answer": "⚠️ No relevant articles found.",
+                "sources": []
+            }
+
+        # Clean text
+        def clean(text):
+            return text.replace("\n", " ").replace("\r", " ").strip()
+
+        # Build context
         context = "\n\n".join([
-            f"[{doc.metadata.get('category', 'General')}] {doc.metadata.get('title', 'N/A')}:\n{doc.page_content[:max_article_chars].replace(chr(10), ' ').replace(chr(13), ' ')}"
-            for doc in relevant_docs
+            f"[{d.metadata.get('category','General')}] {d.metadata.get('title','N/A')}:\n"
+            f"{clean(d.page_content)[:max_chars]}"
+            for d in docs
         ])
 
-        # Build system + user messages for SambaNova
-        system_msg = {
-            "role": "system",
-            "content": (
-                "You are a helpful assistant. Answer the question by summarizing information from the provided news articles. "
-                "Do not invent information. Cite sources in brackets with title or category when relevant."
-            )
-        }
-        user_msg = {
-            "role": "user",
-            "content": f"ARTICLES:\n{context}\n\nQUESTION: {query}\nANSWER:"
-        }
+        # Build messages with memory
+        messages = build_messages(query, context)
 
-        # Call SambaNova
+        # LLM call
         response = client.chat.completions.create(
             model="Meta-Llama-3.1-8B-Instruct",
-            messages=[system_msg, user_msg],
+            messages=messages,
             temperature=0.2,
-            top_p=0.95
         )
 
         answer = response.choices[0].message.content.strip()
-        return answer, relevant_docs
+        if not answer:
+            answer = "⚠️ Could not generate a proper answer. Try again."
+
+        # ✅ store memory
+        chat_history.append({
+            "user": query,
+            "assistant": answer
+        })
+
+        # limit memory
+        if len(chat_history) > 10:
+            chat_history.pop(0)
+
+        return {
+            "answer": answer,
+            "sources": [
+                {
+                    "title": d.metadata.get("title", ""),
+                    "category": d.metadata.get("category", ""),
+                    "link": d.metadata.get("source", "")
+                }
+                for d in docs
+            ]
+        }
 
     except Exception as e:
-        return f"❌ Error generating response: {e}", []
-
-# ───────────────────────────────
-# Interactive chat loop
-# ───────────────────────────────
-def main():
-    print("=" * 80)
-    print("📰 RAG Chat with SambaNova (Category-aware, ChatGPT-style)")
-    print("=" * 80)
-    print("Type 'exit' or 'quit' to exit.\n")
-
-    while True:
-        query = input("\n📝 You: ").strip()
-        if query.lower() in ["exit", "quit"]:
-            print("👋 Goodbye!")
-            break
-        if not query:
-            continue
-
-        print("\n🔍 Searching and generating answer...\n")
-        answer, docs = generate_qa_response(query)
-
-        print("💡 Assistant:")
-        print(answer)
-
-        if docs:
-            print("\n📚 Sources:")
-            for i, doc in enumerate(docs, 1):
-                title = doc.metadata.get("title", "N/A")
-                category = doc.metadata.get("category", "General")
-                date = doc.metadata.get("date", "Unknown")
-                print(f"{i}. [{category}] {title} ({date})")
-
-        chat_history.append({"user": query, "assistant": answer})
-
-if __name__ == "__main__":
-    main()
+        return {
+            "answer": f"❌ Error: {e}",
+            "sources": []
+        }

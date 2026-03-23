@@ -26,7 +26,7 @@ print("First 8 values:", vector[:8])
 # Step 2: Load articles (new only)
 # -------------------------------
 # You can filter by category if you want, e.g., category="Technology"
-documents = load_articles(limit=2000)  # loader already prevents duplicates
+documents = load_articles(limit=None)  # loader already prevents duplicates
 print(f"\nLoaded {len(documents)} articles. Creating FAISS index...")
 
 # -------------------------------
