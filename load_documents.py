@@ -70,7 +70,7 @@ def load_articles(limit=None, category=None, ignore_loaded=True):
 
 # ---------------- Test
 if __name__ == "__main__":
-    docs = load_articles(limit=50, ignore_loaded=True)
+    docs = load_articles(limit=None, ignore_loaded=True)
     print(f"Total articles loaded: {len(docs)}")
     for i, doc in enumerate(docs[:5], 1):
         print(f"\n--- Document {i} ---")
