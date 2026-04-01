@@ -2,15 +2,15 @@
 import os
 import re
 from langchain_community.vectorstores import FAISS
+from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from sambanova import SambaNova
-from create_embeddings_and_fiass import embeddings
 
 # -----------------------------
 # GLOBALS
 # -----------------------------
 vectorstore = None
 client = None
-chat_history = []   # ✅ basic memory
+chat_history = []
 
 CATEGORIES = ["Politics", "Technology", "Sports", "Business", "Health", "Entertainment", "World", "Science"]
 
@@ -22,17 +22,28 @@ def init_rag():
 
     print("🔄 Initializing RAG system...")
 
-    # Load FAISS index
+    # ✅ FIX 1: Proper embeddings initialization
+    embeddings = HuggingFaceEmbeddings(
+        model_name="BAAI/bge-small-en-v1.5",
+        model_kwargs={"device": "cuda"},
+        encode_kwargs={"normalize_embeddings": True}
+    )
+
+    # ✅ FIX 2: Safe FAISS loading
+    if not os.path.exists("./faiss_npr_test"):
+        raise FileNotFoundError("❌ FAISS index not found. Run embedding step first.")
+
     vectorstore = FAISS.load_local(
         "./faiss_npr_test",
         embeddings,
         allow_dangerous_deserialization=True
     )
 
+    # ✅ FIX 3: Use env variable for API key
     client = SambaNova(
-        api_key="6bdd58a3-792a-40fb-af59-9abbc3ca6e4a",
-        base_url="https://api.sambanova.ai/v1",
-    )
+            api_key="9178836e-f0bd-4229-bbbe-e295bf1a7f3f",
+            base_url="https://api.sambanova.ai/v1",
+        )
 
 
     print("✅ RAG ready!")
@@ -58,12 +69,10 @@ def build_messages(query, context):
         }
     ]
 
-    # ✅ last 3 conversations
     for chat in chat_history[-3:]:
         messages.append({"role": "user", "content": chat["user"]})
         messages.append({"role": "assistant", "content": chat["assistant"]})
 
-    # current query
     messages.append({
         "role": "user",
         "content": f"ARTICLES:\n{context}\n\nQUESTION: {query}"
@@ -84,21 +93,19 @@ def query_rag(query: str, max_chars=700):
         }
 
     try:
-        # Category filtering
         category = detect_category(query)
 
-        if category:
-            retriever = vectorstore.as_retriever(
-                search_type="mmr",
-                search_kwargs={"k": 5, "filter": {"category": category}}
-            )
-        else:
-            retriever = vectorstore.as_retriever(
-                search_type="mmr",
-                search_kwargs={"k": 5}
-            )
+        # ✅ safer retriever
+        retriever = vectorstore.as_retriever(
+            search_type="mmr",
+            search_kwargs={"k": 5}
+        )
 
         docs = retriever.invoke(query)
+
+        # ✅ manual filtering (more reliable than FAISS filter)
+        if category:
+            docs = [d for d in docs if d.metadata.get("category") == category]
 
         if not docs:
             return {
@@ -106,21 +113,17 @@ def query_rag(query: str, max_chars=700):
                 "sources": []
             }
 
-        # Clean text
         def clean(text):
             return text.replace("\n", " ").replace("\r", " ").strip()
 
-        # Build context
         context = "\n\n".join([
             f"[{d.metadata.get('category','General')}] {d.metadata.get('title','N/A')}:\n"
             f"{clean(d.page_content)[:max_chars]}"
             for d in docs
         ])
 
-        # Build messages with memory
         messages = build_messages(query, context)
 
-        # LLM call
         response = client.chat.completions.create(
             model="Meta-Llama-3.1-8B-Instruct",
             messages=messages,
@@ -128,16 +131,16 @@ def query_rag(query: str, max_chars=700):
         )
 
         answer = response.choices[0].message.content.strip()
+
         if not answer:
             answer = "⚠️ Could not generate a proper answer. Try again."
 
-        # ✅ store memory
+        # store memory
         chat_history.append({
             "user": query,
             "assistant": answer
         })
 
-        # limit memory
         if len(chat_history) > 10:
             chat_history.pop(0)
 
@@ -147,7 +150,7 @@ def query_rag(query: str, max_chars=700):
                 {
                     "title": d.metadata.get("title", ""),
                     "category": d.metadata.get("category", ""),
-                    "link": d.metadata.get("source", "")
+                    "date": d.metadata.get("date", "")
                 }
                 for d in docs
             ]

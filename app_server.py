@@ -4,15 +4,15 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from rag_with_sambanova import init_rag, query_rag  # ✅ use correct file name
+from rag_with_sambanova import init_rag, query_rag, chat_history  # import memory
 
 # -----------------------------
-# LIFESPAN HANDLER (NEW WAY)
+# LIFESPAN HANDLER
 # -----------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("🚀 Starting up...")
-    init_rag()   # initialize RAG
+    print("🚀 Starting up RAG system...")
+    init_rag()   # initialize RAG (blocking call, okay for startup)
     yield
     print("🛑 Shutting down...")
 
@@ -50,11 +50,11 @@ def home():
 
 @app.post("/ask")
 def ask(req: QueryRequest):
-    return query_rag(req.question)
+    # call RAG query function
+    result = query_rag(req.question)
+    return result
 
-# Optional: clear memory endpoint
 @app.post("/clear-memory")
 def clear_memory():
-    from rag_with_sambanova import chat_history
     chat_history.clear()
     return {"status": "Memory cleared"}
