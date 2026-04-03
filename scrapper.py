@@ -104,7 +104,7 @@ def scrape_bbc(existing_links, max_articles=100):
             img_tag = soup.find("meta", property="og:image")
             image_url = img_tag["content"] if img_tag else None
             articles.append(
-                ("BBC", "General", title, link, teaser, image_url, full_text[:2000])
+                ("BBC", "General", title, link, teaser, image_url, full_text[:4000])
             )
             pbar.update(1)
     return articles
@@ -119,98 +119,110 @@ def scrape_npr(existing_links, max_articles=100):
         r = safe_request(section)
         if not r:
             continue
+
         soup = BeautifulSoup(r.text, "html.parser")
+
         for a in soup.find_all("a", href=True):
             href = a["href"]
+
             if "/2026/" in href and len(a.get_text(strip=True)) > 20:
                 full_link = urljoin("https://www.npr.org", href)
                 links.append((full_link, a.get_text(strip=True)))
+
     links = links[:max_articles]
 
     with tqdm(total=len(links), desc="NPR") as pbar:
         for link, title in links:
+
             if link in existing_links:
                 pbar.update(1)
                 continue
 
-            # Try getting image from RSS content first
-            image_url = None
-            try:
-                # Fetch RSS for this link
-                rss_url = link + "?rss=1"
-                rss_resp = safe_request(rss_url)
-                if rss_resp:
-                    rss_soup = BeautifulSoup(rss_resp.content, "xml")
-                    content_encoded = rss_soup.find("content:encoded")
-                    if content_encoded:
-                        # Look for the first <img> in the encoded HTML
-                        img_in_rss = BeautifulSoup(content_encoded.text, "html.parser").find("img")
-                        if img_in_rss and img_in_rss.get("src"):
-                            image_url = img_in_rss["src"]
-            except:
-                pass
-
-            # Fallback: normal article page scrape
             r = safe_request(link)
             if not r:
                 pbar.update(1)
                 continue
+
             soup = BeautifulSoup(r.text, "html.parser")
 
-            # Get full text
+            # Extract article text
             paragraphs = (
                 soup.select("article p") or
                 soup.select("div.storytext p") or
                 soup.select("div.body-text p") or
                 soup.select("div#storytext p")
             )
-            full_text = clean_text(" ".join(p.get_text() for p in paragraphs)) if paragraphs else ""
+
+            full_text = clean_text(
+                " ".join(p.get_text() for p in paragraphs)
+            ) if paragraphs else ""
+
             teaser = paragraphs[0].get_text(strip=True) if paragraphs else ""
 
-            # If no image from RSS, try finding first article image in HTML
-            if not image_url:
-                first_img_html = soup.select_one("article img, div.storytext img, div.body-text img")
-                if first_img_html and first_img_html.get("src"):
-                    image_url = first_img_html["src"]
+            # ❌ Image removed completely
+            image_url = None
 
             articles.append(
-                ("NPR", "General", title, link, teaser, image_url, full_text[:2000])
+                ("NPR", "General", title, link, teaser, image_url, full_text[:4000])
             )
+
             pbar.update(1)
+
     return articles
+
 
 # ---------------- INDIA ----------------
 def scrape_india(existing_links, max_articles=100):
     articles = []
     all_items = []
+
+    # Collect RSS items
     for rss in INDIA_RSS:
         r = safe_request(rss)
         if not r:
             continue
         soup = BeautifulSoup(r.content, "xml")
         all_items.extend(soup.find_all("item"))
+
     all_items = all_items[:max_articles]
+
     with tqdm(total=len(all_items), desc="India") as pbar:
         for item in all_items:
             link = item.link.text
             if link in existing_links:
                 pbar.update(1)
                 continue
-            title = item.title.text
-            teaser = item.description.text if item.description else ""
+
+            # Title
+            title = item.title.text if item.title else ""
+
+            # Clean teaser from HTML tags, remove images etc.
+            if item.description:
+                teaser_soup = BeautifulSoup(item.description.text, "html.parser")
+                teaser = clean_text(teaser_soup.get_text())
+            else:
+                teaser = ""
+
+            # Full article
             r = safe_request(link)
             if not r:
                 pbar.update(1)
                 continue
+
             soup = BeautifulSoup(r.text, "html.parser")
             paragraphs = soup.select("p")
             full_text = clean_text(" ".join(p.get_text() for p in paragraphs))
+
+            # Image
             img_tag = soup.find("meta", property="og:image")
             image_url = img_tag["content"] if img_tag else None
+
             articles.append(
                 ("Indian News", "India", title, link, teaser, image_url, full_text[:2000])
             )
+
             pbar.update(1)
+
     return articles
 
 # ---------------- AL JAZEERA ----------------
@@ -275,7 +287,7 @@ def scrape_aljazeera(existing_links, max_articles=120):
             img_tag = soup.find("meta", property="og:image")
             image_url = img_tag["content"] if img_tag else None
             articles.append(
-                ("Al Jazeera", "International", title, link, teaser, image_url, full_text[:2000])
+                ("Al Jazeera", "International", title, link, teaser, image_url, full_text[:4000])
             )
             pbar.update(1)
     return articles
@@ -321,8 +333,9 @@ def scrape_ekantipur(existing_links, max_articles=150):
         for attempt in range(3):
             try:
                 t_title = translator.translate(title, dest="en").text
-                t_full  = translator.translate(full[:2000], dest="en").text   # limit length to reduce failure
-                return ("eKantipur", "Nepal", t_title, link, teaser, img_url, t_full)
+                t_teaser = translator.translate(teaser, dest="en").text
+                t_full  = translator.translate(full[:4000], dest="en").text   # limit length to reduce failure
+                return ("eKantipur", "Nepal", t_title, link, t_teaser, img_url, t_full)
             except Exception as e:
                 time.sleep(2)
         return None

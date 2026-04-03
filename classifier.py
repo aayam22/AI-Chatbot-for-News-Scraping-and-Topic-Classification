@@ -88,7 +88,7 @@ def main():
         classifier(
             KeyDataset(dataset, "text"),
             candidate_labels=CATEGORIES,
-            batch_size=32,
+            batch_size=64,
             truncation=True
         ),
         total=len(dataset),
