@@ -1,10 +1,12 @@
-# app_server.py
+# app_server_chat.py
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from rag_with_sambanova import init_rag, query_rag, chat_history  # import memory
+# ✅ Import the updated ChatGPT-style RAG module
+from rag_with_sambanova import init_rag, query_rag, chat_history  
 
 # -----------------------------
 # LIFESPAN HANDLER
@@ -12,7 +14,8 @@ from rag_with_sambanova import init_rag, query_rag, chat_history  # import memor
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("🚀 Starting up RAG system...")
-    init_rag()   # initialize RAG (blocking call, okay for startup)
+    # Initialize RAG (blocking startup call)
+    init_rag()
     yield
     print("🛑 Shutting down...")
 
@@ -20,7 +23,7 @@ async def lifespan(app: FastAPI):
 # FASTAPI APP
 # -----------------------------
 app = FastAPI(
-    title="News RAG API",
+    title="News ChatGPT-style RAG API",
     lifespan=lifespan
 )
 
@@ -46,15 +49,21 @@ class QueryRequest(BaseModel):
 # -----------------------------
 @app.get("/")
 def home():
-    return {"message": "News RAG API running"}
+    return {"message": "News ChatGPT-style RAG API running"}
 
 @app.post("/ask")
 def ask(req: QueryRequest):
-    # call RAG query function
+    """
+    Handles user query and returns a ChatGPT-style concise answer
+    with summarized content and image URLs if present.
+    """
     result = query_rag(req.question)
     return result
 
 @app.post("/clear-memory")
 def clear_memory():
+    """
+    Clears chat memory to reset context.
+    """
     chat_history.clear()
     return {"status": "Memory cleared"}

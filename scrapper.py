@@ -7,16 +7,16 @@ from urllib.parse import urljoin
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from langdetect import detect
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 # ---------------- SETTINGS ----------------
 DB_FILE = "global_news.db"
-translator = Translator()
+translator = GoogleTranslator(source='auto', target='en')
 
 session = requests.Session()
 session.headers.update({"User-Agent": "Mozilla/5.0"})
 
 
-MAX_WORKERS = 10
+MAX_WORKERS = 20
 TRANS_WORKERS = 5  # threads for parallel translation
 
 # ---------------- SOURCES ----------------
@@ -293,10 +293,12 @@ def scrape_aljazeera(existing_links, max_articles=120):
     return articles
 
 # eKantipur (all-in-one)
+# ---------------- eKantipur (Chunk 2000 → Full 4000) ----------------
 def scrape_ekantipur(existing_links, max_articles=150):
     r = safe_request("https://ekantipur.com/")
     if not r: return []
-    soup = BeautifulSoup(r.text, "html.parser")
+    
+    soup = BeautifulSoup(r.text, "lxml")
     links = set()
     for a in soup.select('a[href*="/20"]'):
         href = a.get("href")
@@ -311,34 +313,42 @@ def scrape_ekantipur(existing_links, max_articles=150):
         if link in existing_links: return None
         r = safe_request(link)
         if not r: return None
-        s = BeautifulSoup(r.text, "html.parser")
+        
+        s = BeautifulSoup(r.text, "lxml")
+        
         # title
-        title = None
         og = s.find("meta", property="og:title")
-        if og and og.get("content"):
-            title = og["content"].strip()
-        else:
-            h1 = s.find("h1")
-            if h1: title = h1.get_text(strip=True)
+        title = (og["content"].strip() if og and og.get("content") 
+                else s.find("h1").get_text(strip=True) if s.find("h1") else None)
         if not title: return None
+        
         # text
         ps = s.select("div.description p, div.story p, article p") or s.select("p")
         if not ps: return None
         full = clean_text(" ".join(p.get_text() for p in ps))
         teaser = ps[0].get_text(strip=True) if ps else ""
+        
         # image
         img = s.find("meta", property="og:image")
         img_url = img["content"] if img else None
-        # translate
-        for attempt in range(3):
-            try:
-                t_title = translator.translate(title, dest="en").text
-                t_teaser = translator.translate(teaser, dest="en").text
-                t_full  = translator.translate(full[:4000], dest="en").text   # limit length to reduce failure
-                return ("eKantipur", "Nepal", t_title, link, t_teaser, img_url, t_full)
-            except Exception as e:
-                time.sleep(2)
-        return None
+
+        # Chunk into 2000 but keep up to 4000 final
+        try:
+            t_title = translator.translate(title) if title else ""
+            t_teaser = translator.translate(teaser) if teaser else ""
+            
+            # Split into 2000 char chunks
+            chunks = [full[i:i+2000] for i in range(0, min(len(full), 4000), 2000)]
+            t_chunks = []
+            for chunk in chunks:
+                if chunk.strip():
+                    t_chunks.append(translator.translate(chunk))
+                    time.sleep(0.8)          # safe delay
+            t_full = " ".join(t_chunks)
+            
+            return ("eKantipur", "Nepal", t_title, link, t_teaser, img_url, t_full)
+        except:
+            return ("eKantipur", "Nepal", title, link, teaser, img_url, full[:4000])
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
         futures = [ex.submit(process_link, lnk) for lnk in links]
