@@ -30,7 +30,7 @@ def init_rag(
     faiss_path="./faiss_npr_test",
     embedding_model="BAAI/bge-small-en-v1.5",
     llm_model_param="Meta-Llama-3.1-8B-Instruct",
-    sambanova_api_key="9178836e-f0bd-4229-bbbe-e295bf1a7f3f"
+    sambanova_api_key=os.getenv("SAMBANOVA_API_KEY")
 ):
     global vectorstore, client, llm_model
     llm_model = llm_model_param
