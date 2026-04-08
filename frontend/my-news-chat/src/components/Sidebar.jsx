@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
-export default function Sidebar() {
+export default function Sidebar({ setToken }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const menuItems = [
     { name: "FEED", path: "/", icon: "▤" },
@@ -15,7 +16,7 @@ export default function Sidebar() {
   const sidebarStyle = {
     width: isCollapsed ? '80px' : '260px',
     height: '100vh',
-    flexShrink: 0, // prevents shrinking
+    flexShrink: 0,
     borderRight: '4px solid #000',
     backgroundColor: '#eee',
     display: 'flex',
@@ -50,6 +51,14 @@ export default function Sidebar() {
     justifyContent: 'center',
     backgroundColor: '#fff',
     zIndex: 10
+  };
+
+  // Logout: clear JWT & chat, redirect to login
+  const handleLogout = () => {
+    localStorage.removeItem("token");      
+    localStorage.removeItem("chat_messages"); 
+    setToken(null); // Update App state to hide sidebar
+    navigate("/login");                     
   };
 
   return (
@@ -111,20 +120,23 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div style={{ padding: '24px', borderTop: '2px solid #000' }}>
-        <button style={{
-          width: '100%',
-          padding: '12px',
-          backgroundColor: 'transparent',
-          border: '2px solid #000',
-          fontWeight: '900',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px',
-          boxShadow: '4px 4px 0px #000',
-          transform: 'translate(-2px, -2px)',
-        }}>
+        <button 
+          onClick={handleLogout} 
+          style={{
+            width: '100%',
+            padding: '12px',
+            backgroundColor: 'transparent',
+            border: '2px solid #000',
+            fontWeight: '900',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            boxShadow: '4px 4px 0px #000',
+            transform: 'translate(-2px, -2px)',
+          }}
+        >
           <span>↩</span> {!isCollapsed && 'LOGOUT'}
         </button>
       </div>

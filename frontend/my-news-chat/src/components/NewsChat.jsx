@@ -3,19 +3,22 @@ import axios from 'axios';
 
 const BACKEND_URL = 'http://127.0.0.1:8000';
 
-export default function NewsTerminal({ messages, setMessages }) {
+export default function NewsChat({ messages, setMessages }) {
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const chatEndRef = useRef(null);
 
+  const token = localStorage.getItem("token"); // JWT token
+
   const generateMessageId = () => `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+  // Scroll to bottom whenever messages change
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const sendQuestion = async () => {
-    if (!question.trim()) return;
+    if (!question.trim() || !token) return;
 
     const userMsg = {
       id: generateMessageId(),
@@ -24,30 +27,40 @@ export default function NewsTerminal({ messages, setMessages }) {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages(prev => [...prev, userMsg]);
     setQuestion('');
     setLoading(true);
 
     try {
-      const res = await axios.post(`${BACKEND_URL}/ask`, { question: userMsg.text });
-      const data = res.data;
+      const res = await axios.post(
+        `${BACKEND_URL}/ask`,
+        { question: userMsg.text },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
+      const data = res.data;
+      // Ensure answer is a string, not an object
+      const answerText = typeof data.answer === 'string' ? data.answer : JSON.stringify(data.answer);
       const assistantMsg = {
         id: generateMessageId(),
         role: 'assistant',
-        text: data.answer,
-        sources: data.sources?.map(s => ({ ...s, image_url: s.image_url || null })) || [],
+        text: answerText,
+        sources: Array.isArray(data.sources) ? data.sources.map(s => ({ 
+          category: s.category || 'SOURCE',
+          title: s.title || 'Untitled',
+          image_url: s.image_url || null 
+        })) : [],
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
         latency: '14MS',
         tokens: '442'
       };
 
-      setMessages((prev) => [...prev, assistantMsg]);
+      setMessages(prev => [...prev, assistantMsg]);
     } catch (err) {
-      setMessages((prev) => [...prev, {
+      setMessages(prev => [...prev, {
         id: generateMessageId(),
         role: 'assistant',
-        text: '❌ Error: ' + err.message,
+        text: '❌ Error: ' + (err.response?.data?.detail || err.message || 'Unknown error'),
         sources: [],
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
       }]);
@@ -56,108 +69,61 @@ export default function NewsTerminal({ messages, setMessages }) {
     }
   };
 
-  const clearMemory = async () => {
+  const clearChat = async () => {
+    if (!token) return;
     setLoading(true);
     try {
-      await axios.post(`${BACKEND_URL}/clear-memory`);
-      setMessages([{
-        id: generateMessageId(),
-        role: 'assistant',
-        text: '🗑 Memory cleared!',
-        sources: [],
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
-      }]);
+      await axios.post(
+        `${BACKEND_URL}/clear-memory`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
     } catch (err) {
-      setMessages((prev) => [...prev, {
-        id: generateMessageId(),
-        role: 'assistant',
-        text: '❌ Error clearing memory: ' + err.message,
-        sources: [],
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
-      }]);
+      console.warn("Error clearing backend memory:", err.response?.data?.detail || err.message);
     } finally {
+      setMessages([]);
+      localStorage.removeItem("chat_messages");
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: '"Space Grotesk", sans-serif', backgroundColor: '#fff', color: '#000' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontFamily: '"Space Grotesk", sans-serif' }}>
       
-      {/* Top Header */}
-      <header style={{ 
-        height: '64px', 
-        borderBottom: '4px solid #000', 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        padding: '0 32px' 
-      }}>
-        <h1 style={{ fontSize: '24px', fontWeight: '900', margin: 0 }}>NEWS_TERMINAL_V2</h1>
-      </header>
-
-      {/* Chat Stream */}
-      <div style={{ 
-        flex: 1, 
-        overflowY: 'auto', 
-        padding: '40px', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: '40px' 
-      }}>
-        {/* Session Info */}
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <span style={{ fontSize: '10px', fontWeight: 'bold', padding: '4px 12px', border: '2px solid #000' }}>
-            TERMINAL_SESSION_0923 // [ENCRYPTION: AES-256]
-          </span>
-        </div>
-
+      {/* Chat messages */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {messages.length === 0 && (
-          <div style={{ maxWidth: '800px', border: '4px solid #000', padding: '32px', boxShadow: '8px 8px 0px #000' }}>
-            <p style={{ margin: 0, fontSize: '16px', lineHeight: '1.6' }}>
-              Analyzing global market fluctuations following the sudden shift in tech-sector regulations. The current trend indicates a 14.2% volatility spike in decentralized assets.
-            </p>
+          <div style={{ padding: '16px', border: '2px solid #000', maxWidth: '600px' }}>
+            Start a conversation or ask about the latest news...
           </div>
         )}
 
-        {messages.map((m) => (
-          <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start', width: '100%' }}>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', fontSize: '10px', fontWeight: '900', alignItems: 'center' }}>
-              <span>{m.role === 'user' ? '■ USER_INPUT' : '■ ANALYSIS_BOT'}</span>
-              <span style={{ opacity: 0.5 }}>[{m.time}]</span>
-            </div>
-
-            <div style={{ 
-              maxWidth: '85%', 
-              backgroundColor: m.role === 'user' ? '#000' : '#fff', 
-              color: m.role === 'user' ? '#fff' : '#000', 
-              border: '4px solid #000', 
-              padding: '24px', 
-              boxShadow: m.role === 'user' ? 'none' : '8px 8px 0px #000', 
-              position: 'relative' 
+        {messages.map(m => (
+          <div key={m.id} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+            <div style={{
+              padding: '16px',
+              backgroundColor: m.role === 'user' ? '#000' : '#fff',
+              color: m.role === 'user' ? '#fff' : '#000',
+              border: '2px solid #000',
+              maxWidth: '70%',
+              position: 'relative'
             }}>
-              {m.role === 'assistant' && (
-                <div style={{ borderLeft: '4px solid #000', paddingLeft: '16px', marginBottom: '16px', fontStyle: 'italic', opacity: 0.7 }}>
-                  Querying distributed intelligence nodes... Cross-referencing {m.sources.length || 0} sources...
+              {m.role === 'assistant' && Array.isArray(m.sources) && m.sources.length > 0 && (
+                <div style={{ fontSize: '10px', fontStyle: 'italic', marginBottom: '8px' }}>
+                  Cross-referencing {m.sources.length} source(s)...
                 </div>
               )}
-              
-              <div style={{ fontSize: '16px', lineHeight: '1.6' }}>{m.text}</div>
+              <div style={{ fontSize: '14px', lineHeight: '1.5' }}>{String(m.text)}</div>
 
-              {m.role === 'assistant' && m.sources && m.sources.length > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '24px' }}>
+              {m.role === 'assistant' && Array.isArray(m.sources) && m.sources.length > 0 && (
+                <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   {m.sources.map((s, idx) => (
-                    <div key={idx} style={{ border: '2px solid #000', padding: '12px' }}>
-                      <div style={{ fontSize: '10px', fontWeight: '900', marginBottom: '4px' }}>{s.category || 'SOURCE_INTEL'}</div>
-                      <div style={{ fontSize: '12px', fontWeight: 'bold' }}>{s.title}</div>
-                      {s.image_url && <img src={s.image_url} alt={s.title} style={{ marginTop: '8px', maxHeight: '120px', width: '100%', objectFit: 'cover' }} />}
+                    <div key={idx} style={{ border: '1px solid #000', padding: '8px', fontSize: '12px' }}>
+                      <div style={{ fontWeight: '900', fontSize: '10px' }}>{String(s.category || 'SOURCE')}</div>
+                      <div style={{ fontWeight: 'bold' }}>{String(s.title || 'Untitled')}</div>
+                      {s.image_url && typeof s.image_url === 'string' && <img src={s.image_url} alt={s.title} style={{ width: '100%', maxHeight: '100px', objectFit: 'cover', marginTop: '4px' }} />}
                     </div>
                   ))}
-                </div>
-              )}
-
-              {m.role === 'assistant' && (
-                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(0,0,0,0.1)', display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: 'bold', opacity: 0.5 }}>
-                  <span>[LATENCY: {m.latency || '12MS'}] [TOKEN_COUNT: {m.tokens || '442'}]</span>
                 </div>
               )}
             </div>
@@ -165,87 +131,25 @@ export default function NewsTerminal({ messages, setMessages }) {
         ))}
 
         {loading && (
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <div style={{ width: '12px', height: '12px', backgroundColor: '#000', animation: 'pulse 1s infinite' }}></div>
-            <span style={{ fontWeight: '900', fontSize: '12px' }}>PROCESSING_REQUEST...</span>
-          </div>
+          <div style={{ fontWeight: '900', opacity: 0.6 }}>Processing request...</div>
         )}
-        
+
         <div ref={chatEndRef} />
       </div>
 
-      {/* Footer Input Area */}
-      <footer style={{ 
-        padding: '24px 40px', 
-        borderTop: '4px solid #000', 
-        backgroundColor: '#f9f9f9', 
-        display: 'flex', 
-        gap: '20px', 
-        alignItems: 'center' 
-      }}>
-        <button onClick={clearMemory} style={{ 
-          width: '48px', 
-          height: '48px', 
-          border: '3px solid #000', 
-          backgroundColor: '#fff', 
-          cursor: 'pointer', 
-          fontSize: '20px',
-          fontWeight: '900'
-        }}>🗑</button>
-        
-        <div style={{ flex: 1, position: 'relative' }}>
-          <div style={{ 
-            position: 'absolute', 
-            top: '-10px', 
-            left: '12px', 
-            backgroundColor: '#f9f9f9', 
-            padding: '0 8px', 
-            fontSize: '10px', 
-            fontWeight: '900' 
-          }}>PROMPT_INPUT_COMMAND</div>
-          <input
-            type="text"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendQuestion()}
-            placeholder="ENTER QUERY..."
-            style={{ 
-              width: '100%', 
-              padding: '16px', 
-              border: '3px solid #000', 
-              backgroundColor: '#fff', 
-              fontFamily: '"Space Grotesk", monospace', 
-              fontSize: '14px', 
-              fontWeight: 'bold', 
-              outline: 'none' 
-            }}
-          />
-        </div>
-
-        <button onClick={sendQuestion} style={{ 
-          backgroundColor: '#000', 
-          color: '#fff', 
-          border: 'none', 
-          padding: '0 32px', 
-          height: '54px', 
-          fontWeight: '900',
-          fontSize: '14px',
-          cursor: 'pointer'
-        }}>
-          SEND ✉
-        </button>
-      </footer>
-
-      <style>{`
-        @keyframes pulse {
-          0% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(0.8); }
-          100% { opacity: 1; transform: scale(1); }
-        }
-        *::-webkit-scrollbar { width: 8px; }
-        *::-webkit-scrollbar-track { background: #eee; }
-        *::-webkit-scrollbar-thumb { background: #000; }
-      `}</style>
+      {/* Input */}
+      <div style={{ display: 'flex', padding: '16px', borderTop: '2px solid #000' }}>
+        <input
+          type="text"
+          value={question}
+          onChange={e => setQuestion(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && sendQuestion()}
+          placeholder="Type your question..."
+          style={{ flex: 1, padding: '12px', fontWeight: 'bold', border: '2px solid #000', marginRight: '8px' }}
+        />
+        <button onClick={sendQuestion} style={{ padding: '12px', fontWeight: '900', border: '2px solid #000' }}>Send</button>
+        <button onClick={clearChat} style={{ padding: '12px', fontWeight: '900', border: '2px solid #000', marginLeft: '8px' }}>Clear</button>
+      </div>
     </div>
   );
 }
