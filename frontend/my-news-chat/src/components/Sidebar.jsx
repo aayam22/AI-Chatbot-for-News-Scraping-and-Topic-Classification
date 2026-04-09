@@ -1,8 +1,11 @@
-import { useState } from 'react';
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { STORAGE_KEYS } from '../constants/config';
 
-export default function Sidebar({ setToken }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+/**
+ * Sidebar Component - Navigation and layout sidebar
+ * Handles menu items, collapse toggle, and logout
+ */
+export default function Sidebar({ setToken, isCollapsed, setIsCollapsed }) {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -24,7 +27,10 @@ export default function Sidebar({ setToken }) {
     transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     fontFamily: '"Space Grotesk", sans-serif',
     overflow: 'hidden',
-    position: 'relative'
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    zIndex: 1000
   };
 
   const headerStyle = {
@@ -53,12 +59,11 @@ export default function Sidebar({ setToken }) {
     zIndex: 10
   };
 
-  // Logout: clear JWT & chat, redirect to login
   const handleLogout = () => {
-    localStorage.removeItem("token");      
-    localStorage.removeItem("chat_messages"); 
-    setToken(null); // Update App state to hide sidebar
-    navigate("/login");                     
+    localStorage.removeItem(STORAGE_KEYS.TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.CHAT_MESSAGES);
+    setToken(null);
+    navigate("/login");
   };
 
   return (
@@ -76,10 +81,20 @@ export default function Sidebar({ setToken }) {
       <div style={headerStyle}>
         {!isCollapsed ? (
           <>
-            <h2 style={{ fontSize: '20px', fontWeight: '900', margin: 0, letterSpacing: '-1px' }}>
+            <h2 style={{ 
+              fontSize: '20px', 
+              fontWeight: '900', 
+              margin: 0, 
+              letterSpacing: '-1px' 
+            }}>
               INTEL_CORE
             </h2>
-            <div style={{ fontSize: '10px', fontWeight: 'bold', opacity: 0.6, marginTop: '4px' }}>
+            <div style={{ 
+              fontSize: '10px', 
+              fontWeight: 'bold', 
+              opacity: 0.6, 
+              marginTop: '4px' 
+            }}>
               STATUS: OPTIMAL
             </div>
           </>
@@ -118,7 +133,7 @@ export default function Sidebar({ setToken }) {
         })}
       </nav>
 
-      {/* Footer */}
+      {/* Footer - Logout Button */}
       <div style={{ padding: '24px', borderTop: '2px solid #000' }}>
         <button 
           onClick={handleLogout} 

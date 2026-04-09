@@ -1,23 +1,25 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
-import NewsChat from "./components/NewsChat";
-import Login from "./components/Login";
-import Register from "./components/Register";
+import ChatPage from "./pages/ChatPage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
 import { useState, useEffect } from "react";
+import { STORAGE_KEYS } from "./constants/config";
 
 function App() {
   const [messages, setMessages] = useState([]);
-  const [token, setToken] = useState(localStorage.getItem("token") || null);
+  const [token, setToken] = useState(localStorage.getItem(STORAGE_KEYS.TOKEN) || null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Load messages from localStorage on mount
   useEffect(() => {
-    const savedMessages = localStorage.getItem("chat_messages");
+    const savedMessages = localStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES);
     if (savedMessages) setMessages(JSON.parse(savedMessages));
   }, []);
 
   // Save messages to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem("chat_messages", JSON.stringify(messages));
+    localStorage.setItem(STORAGE_KEYS.CHAT_MESSAGES, JSON.stringify(messages));
   }, [messages]);
 
   // Private Route wrapper
@@ -28,19 +30,26 @@ function App() {
   return (
     <BrowserRouter>
       <div style={{ display: "flex", minHeight: "100vh" }}>
-        {token && <Sidebar setToken={setToken} />} {/* Show sidebar only if logged in */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto" }}>
+        {token && <Sidebar setToken={setToken} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />}
+        <div style={{ 
+          flex: 1, 
+          display: "flex", 
+          flexDirection: "column", 
+          overflow: "auto",
+          marginLeft: token ? (isCollapsed ? '80px' : '260px') : '0px',
+          transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}>
           <Routes>
             {/* Public Routes */}
-            <Route path="/login" element={<Login setToken={setToken} />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/login" element={<LoginPage setToken={setToken} />} />
+            <Route path="/register" element={<RegisterPage />} />
 
             {/* Private Routes */}
             <Route 
               path="/" 
               element={
                 <PrivateRoute>
-                  <NewsChat messages={messages} setMessages={setMessages} />
+                  <ChatPage messages={messages} setMessages={setMessages} />
                 </PrivateRoute>
               } 
             />
