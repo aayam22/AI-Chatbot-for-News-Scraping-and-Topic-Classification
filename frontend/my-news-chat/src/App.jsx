@@ -3,6 +3,7 @@ import Sidebar from "./components/Sidebar";
 import ChatPage from "./pages/ChatPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import AnalysisPage from "./pages/AnalysisPage";
 import { useState, useEffect } from "react";
 import { STORAGE_KEYS } from "./constants/config";
 
@@ -57,7 +58,7 @@ function App() {
               path="/analysis" 
               element={
                 <PrivateRoute>
-                  <h1>Analysis Page</h1>
+                  <AnalysisPage />
                 </PrivateRoute>
               } 
             />

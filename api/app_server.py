@@ -11,6 +11,9 @@ from datetime import datetime, timedelta
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from contextlib import asynccontextmanager
+import sqlite3
+from collections import Counter
+import os
 
 # ✅ Import RAG module with chat_history
 from rag_with_sambanova import init_rag, query_rag, chat_history
@@ -65,6 +68,13 @@ class UserLogin(BaseModel):
 class QueryRequest(BaseModel):
     question: str
 
+class AnalysisResponse(BaseModel):
+    total_articles: int
+    top_categories: list
+    top_sources: list
+    category_distribution: dict
+    source_distribution: dict
+
 # ----------------------------
 # DEPENDENCY
 # ----------------------------
@@ -96,6 +106,107 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         return username
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+# ----------------------------
+# ANALYSIS UTILS
+# ----------------------------
+def get_article_statistics(date_from: str = None, date_to: str = None, category: str = None, source: str = None):
+    """
+    Query global_news.db for advanced analytics with time-series data
+    Supports filtering by date range, predicted_category, and source
+    """
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), '..', 'global_news.db')
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Build query with optional filters - using scraped_at timestamp and predicted_category
+        query = "SELECT scraped_at, predicted_category, source FROM articles WHERE 1=1"
+        params = []
+        
+        if date_from:
+            query += " AND DATE(scraped_at) >= ?"
+            params.append(date_from)
+        if date_to:
+            query += " AND DATE(scraped_at) <= ?"
+            params.append(date_to)
+        if category:
+            query += " AND predicted_category = ?"
+            params.append(category)
+        if source:
+            query += " AND source = ?"
+            params.append(source)
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        print(f"[DEBUG] Query executed, found {len(rows)} rows")  # Debug log
+        if rows:
+            print(f"[DEBUG] Sample row: {rows[0]}")  # Debug log
+        
+        # Process data for time-series
+        time_series = {}
+        category_counter = Counter()
+        source_counter = Counter()
+        
+        for scraped_at, pred_cat, src in rows:
+            # Extract date (YYYY-MM-DD format) from timestamp
+            date_key = scraped_at[:10] if scraped_at else "Unknown"
+            time_series[date_key] = time_series.get(date_key, 0) + 1
+            
+            # Handle None/empty predicted_category as "General"
+            cat_label = pred_cat if pred_cat and pred_cat.strip() else "General"
+            category_counter[cat_label] += 1
+            
+            if src:
+                source_counter[src] += 1
+        
+        # Sort time series by date
+        sorted_dates = sorted(time_series.keys())
+        time_series_sorted = {date: time_series[date] for date in sorted_dates}
+        
+        # Get totals
+        total_articles = len(rows)
+        
+        # Get top predicted categories and sources
+        top_categories = [
+            {"name": cat, "count": count} 
+            for cat, count in category_counter.most_common(5)
+        ]
+        top_sources = [
+            {"name": src, "count": count} 
+            for src, count in source_counter.most_common(5)
+        ]
+        
+        # Get all unique predicted categories and sources for filters
+        all_categories = list(dict.fromkeys([
+            (pred_cat if pred_cat and pred_cat.strip() else "General") 
+            for _, pred_cat, _ in rows
+        ]))
+        all_sources = list(dict.fromkeys([src for _, _, src in rows if src]))
+        
+        print(f"[DEBUG] Categories found: {all_categories}")  # Debug log
+        print(f"[DEBUG] Category distribution: {dict(category_counter)}")  # Debug log
+        
+        conn.close()
+        
+        return {
+            "total_articles": total_articles,
+            "time_series": time_series_sorted,
+            "top_categories": top_categories,
+            "top_sources": top_sources,
+            "category_distribution": dict(category_counter),
+            "source_distribution": dict(source_counter),
+            "available_categories": all_categories,
+            "available_sources": all_sources,
+            "date_range": {
+                "from": sorted_dates[0] if sorted_dates else None,
+                "to": sorted_dates[-1] if sorted_dates else None
+            }
+        }
+    except Exception as e:
+        print(f"[ERROR] {str(e)}")  # Debug log
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 # ----------------------------
 # PER-USER CHAT HISTORY
@@ -193,6 +304,22 @@ def clear_memory(current_user: str = Depends(get_current_user)):
     # Clear only this user's memory
     user_chat_memory[current_user] = []
     return {"status": "Memory cleared", "user": current_user}
+
+# ----------------------------
+# ANALYSIS ROUTES
+# ----------------------------
+@app.get("/analyze")
+def get_analysis(date_from: str = None, date_to: str = None, category: str = None, source: str = None):
+    """
+    Get advanced article statistics with time-series data
+    Query params:
+    - date_from: YYYY-MM-DD format
+    - date_to: YYYY-MM-DD format
+    - category: Filter by specific predicted_category
+    - source: Filter by specific source
+    """
+    stats = get_article_statistics(date_from, date_to, category, source)
+    return stats
 
 # ----------------------------
 # HEALTH CHECK
