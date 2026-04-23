@@ -4,21 +4,18 @@ import ChatInput from './ChatInput';
 import ImagePreview from './ImagePreview';
 import useChat from '../hooks/useChat';
 import { STYLES } from '../constants/styles';
-import { STORAGE_KEYS } from '../constants/config';
 
 /**
  * NewsChat Component - Main chat interface
  * Orchestrates message display, input, and images
  * Uses custom hooks for clean, modular logic
  */
-export default function NewsChat({ messages, setMessages }) {
+export default function NewsChat({ messages, setMessages, token }) {
   const [previewImage, setPreviewImage] = useState(null);
-  const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
   const { sendQuestion, clearChat } = useChat(setMessages, token);
 
   const handleClearChat = async () => {
     await clearChat();
-    localStorage.removeItem(STORAGE_KEYS.CHAT_MESSAGES);
   };
 
   return (

@@ -31,7 +31,6 @@ export default function LoginPage({ setToken }) {
       const token = res.data.access_token;
       if (!token) throw new Error("No token returned");
 
-      localStorage.setItem("token", token);
       setToken(token);
       navigate("/");
     } catch (err) {

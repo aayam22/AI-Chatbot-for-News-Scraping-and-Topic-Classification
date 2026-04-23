@@ -1,23 +1,26 @@
 import { useState, useEffect, useCallback } from 'react';
 import { STORAGE_KEYS } from '../constants/config';
 
+function getInitialMessages() {
+  const savedMessages = localStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES);
+
+  if (!savedMessages) {
+    return [];
+  }
+
+  try {
+    return JSON.parse(savedMessages);
+  } catch (error) {
+    console.error('Error loading messages from localStorage:', error);
+    return [];
+  }
+}
+
 /**
  * Custom hook for managing chat messages with localStorage persistence
  */
 export const useChatMessages = () => {
-  const [messages, setMessages] = useState([]);
-
-  // Load messages from localStorage on mount
-  useEffect(() => {
-    const savedMessages = localStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES);
-    if (savedMessages) {
-      try {
-        setMessages(JSON.parse(savedMessages));
-      } catch (error) {
-        console.error('Error loading messages from localStorage:', error);
-      }
-    }
-  }, []);
+  const [messages, setMessages] = useState(getInitialMessages);
 
   // Save messages to localStorage whenever they change
   useEffect(() => {

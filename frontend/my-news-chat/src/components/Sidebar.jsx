@@ -1,11 +1,10 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { STORAGE_KEYS } from '../constants/config';
 
 /**
  * Sidebar Component - Navigation and layout sidebar
  * Handles menu items, collapse toggle, and logout
  */
-export default function Sidebar({ setToken, isCollapsed, setIsCollapsed }) {
+export default function Sidebar({ onLogout, isCollapsed, setIsCollapsed }) {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -60,9 +59,7 @@ export default function Sidebar({ setToken, isCollapsed, setIsCollapsed }) {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem(STORAGE_KEYS.TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.CHAT_MESSAGES);
-    setToken(null);
+    onLogout();
     navigate("/login");
   };
 

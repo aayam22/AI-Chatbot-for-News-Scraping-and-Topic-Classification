@@ -11,13 +11,14 @@ export function useFetchAnalysis(filterParams) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchAnalysis = useCallback(async () => {
+  const fetchAnalysis = useCallback(async (signal) => {
     try {
       setLoading(true);
       setError(null);
 
       const response = await fetch(
-        `${API_CONFIG.BACKEND_URL}/analyze?${filterParams.toString()}`
+        `${API_CONFIG.BACKEND_URL}/analyze?${filterParams.toString()}`,
+        { signal }
       );
 
       if (!response.ok) {
@@ -25,24 +26,41 @@ export function useFetchAnalysis(filterParams) {
       }
 
       const data = await response.json();
-      console.log('Analysis data received:', data);
+
+      if (signal?.aborted) {
+        return;
+      }
+
       setAnalysisData(data);
     } catch (err) {
+      if (err.name === 'AbortError') {
+        return;
+      }
+
       console.error('Analysis fetch error:', err);
+      setAnalysisData(null);
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, [filterParams]);
 
   useEffect(() => {
-    fetchAnalysis();
+    const controller = new AbortController();
+
+    fetchAnalysis(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
   }, [fetchAnalysis]);
 
   return {
     analysisData,
     loading,
     error,
-    refetch: fetchAnalysis,
+    refetch: () => fetchAnalysis(),
   };
 }

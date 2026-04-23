@@ -3,7 +3,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, or_
 from sqlalchemy.ext.declarative import declarative_base
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -11,9 +11,18 @@ from datetime import datetime, timedelta
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from contextlib import asynccontextmanager
+from email.message import EmailMessage
+from dotenv import load_dotenv
 import sqlite3
 from collections import Counter
 import os
+import secrets
+import smtplib
+
+try:
+    from .password_policy import validate_password_strength
+except ImportError:
+    from password_policy import validate_password_strength
 
 # ✅ Import RAG module with chat_history
 from rag_with_sambanova import (
@@ -25,10 +34,25 @@ from rag_with_sambanova import (
 # ----------------------------
 # CONFIG
 # ----------------------------
+API_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(API_DIR, ".."))
+load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
+load_dotenv(os.path.join(API_DIR, ".env"))
+
 DATABASE_URL = "sqlite:///./users.db"
 SECRET_KEY = "super_secret_key_change_this_in_production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+OTP_EXPIRY_MINUTES = int(os.getenv("OTP_EXPIRY_MINUTES", "10"))
+OTP_LENGTH = int(os.getenv("OTP_LENGTH", "6"))
+OTP_DEBUG_MODE = os.getenv("OTP_DEBUG_MODE", "true").lower() in {"1", "true", "yes", "on"}
+SMTP_HOST = os.getenv("SMTP_HOST")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USERNAME = os.getenv("SMTP_USERNAME")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", SMTP_USERNAME or "no-reply@intel-core.local")
+SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes", "on"}
+SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "false").lower() in {"1", "true", "yes", "on"}
 
 # ----------------------------
 # DATABASE SETUP
@@ -44,6 +68,16 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
 
+class PendingRegistration(Base):
+    __tablename__ = "pending_registrations"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    otp_code = Column(String, nullable=False)
+    otp_expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
 Base.metadata.create_all(bind=engine)
 
 # ----------------------------
@@ -57,6 +91,76 @@ def hash_password(password: str):
 def verify_password(password: str, hashed: str):
     return pwd_context.verify(password, hashed)
 
+def normalize_username(username: str) -> str:
+    return username.strip()
+
+def normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+def cleanup_expired_pending_registrations(db: Session):
+    db.query(PendingRegistration).filter(
+        PendingRegistration.otp_expires_at < datetime.utcnow()
+    ).delete(synchronize_session=False)
+    db.commit()
+
+def generate_otp() -> str:
+    return str(secrets.randbelow(10 ** OTP_LENGTH)).zfill(OTP_LENGTH)
+
+def send_registration_otp(email: str, username: str, otp_code: str) -> str:
+    message = EmailMessage()
+    message["Subject"] = "Your INTEL_CORE signup verification code"
+    message["From"] = SMTP_FROM_EMAIL
+    message["To"] = email
+    message.set_content(
+        f"Hello {username},\n\n"
+        f"Your signup verification code is {otp_code}.\n"
+        f"It expires in {OTP_EXPIRY_MINUTES} minutes.\n\n"
+        "If you did not request this code, you can safely ignore this email."
+    )
+
+    if SMTP_HOST:
+        try:
+            if SMTP_USE_SSL:
+                with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
+                    if SMTP_USERNAME and SMTP_PASSWORD:
+                        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+                    server.send_message(message)
+            else:
+                with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+                    if SMTP_USE_TLS:
+                        server.starttls()
+                    if SMTP_USERNAME and SMTP_PASSWORD:
+                        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+                    server.send_message(message)
+            return "email"
+        except Exception as exc:
+            print(f"[OTP ERROR] Failed to send OTP email to {email}: {exc}")
+            if not OTP_DEBUG_MODE:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Unable to send verification code right now. Please try again later."
+                )
+
+    if OTP_DEBUG_MODE:
+        print(f"[OTP DEBUG] Verification code for {email}: {otp_code}")
+        return "debug"
+
+    raise HTTPException(
+        status_code=500,
+        detail="OTP delivery is not configured on the server."
+    )
+
+def build_otp_response(email: str, otp_code: str, delivery: str):
+    response = {
+        "message": "Verification code sent successfully.",
+        "email": email,
+        "expires_in_minutes": OTP_EXPIRY_MINUTES,
+        "delivery": delivery,
+    }
+    if delivery == "debug":
+        response["debug_otp"] = otp_code
+    return response
+
 # ----------------------------
 # SCHEMAS
 # ----------------------------
@@ -64,6 +168,11 @@ class UserCreate(BaseModel):
     username: str
     email: str
     password: str
+
+class RegistrationVerify(BaseModel):
+    username: str
+    email: str
+    otp: str
 
 class UserLogin(BaseModel):
     username: str
@@ -258,27 +367,120 @@ app.add_middleware(
 # AUTH ROUTES
 # ----------------------------
 @app.post("/register")
-def register(user: UserCreate, db: Session = Depends(get_db)):
+def register(user: RegistrationVerify, db: Session = Depends(get_db)):
+    cleanup_expired_pending_registrations(db)
+
+    username = normalize_username(user.username)
+    email = normalize_email(user.email)
+    otp = user.otp.strip()
+
     existing = db.query(User).filter(
-        (User.username == user.username) | (User.email == user.email)
+        or_(User.username == username, User.email == email)
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="Username or email already exists")
 
+    pending = db.query(PendingRegistration).filter(
+        PendingRegistration.username == username,
+        PendingRegistration.email == email
+    ).first()
+
+    if not pending:
+        raise HTTPException(
+            status_code=400,
+            detail="No pending signup found. Request a new verification code."
+        )
+
+    if pending.otp_expires_at < datetime.utcnow():
+        db.delete(pending)
+        db.commit()
+        raise HTTPException(status_code=400, detail="OTP expired. Request a new verification code.")
+
+    if pending.otp_code != otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP.")
+
     new_user = User(
-        username=user.username,
-        email=user.email,
-        hashed_password=hash_password(user.password)
+        username=username,
+        email=email,
+        hashed_password=pending.hashed_password
     )
     db.add(new_user)
+    db.delete(pending)
     db.commit()
     db.refresh(new_user)
-    return {"username": new_user.username, "email": new_user.email}
+    return {
+        "message": "Registered successfully.",
+        "username": new_user.username,
+        "email": new_user.email
+    }
+
+
+@app.post("/register/request-otp")
+def request_registration_otp(user: UserCreate, db: Session = Depends(get_db)):
+    cleanup_expired_pending_registrations(db)
+
+    username = normalize_username(user.username)
+    email = normalize_email(user.email)
+    password = user.password
+
+    if not username or not email or not password:
+        raise HTTPException(status_code=400, detail="Username, email, and password are required.")
+
+    password_errors = validate_password_strength(password, username=username, email=email)
+    if password_errors:
+        raise HTTPException(status_code=400, detail=" ".join(password_errors))
+
+    existing = db.query(User).filter(
+        or_(User.username == username, User.email == email)
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Username or email already exists")
+
+    pending = db.query(PendingRegistration).filter(
+        or_(PendingRegistration.username == username, PendingRegistration.email == email)
+    ).first()
+
+    if pending and (pending.username != username or pending.email != email):
+        raise HTTPException(
+            status_code=400,
+            detail="Username or email is already awaiting verification."
+        )
+
+    otp_code = generate_otp()
+    expires_at = datetime.utcnow() + timedelta(minutes=OTP_EXPIRY_MINUTES)
+
+    if pending:
+        pending.username = username
+        pending.email = email
+        pending.hashed_password = hash_password(password)
+        pending.otp_code = otp_code
+        pending.otp_expires_at = expires_at
+        pending.created_at = datetime.utcnow()
+    else:
+        pending = PendingRegistration(
+            username=username,
+            email=email,
+            hashed_password=hash_password(password),
+            otp_code=otp_code,
+            otp_expires_at=expires_at,
+        )
+        db.add(pending)
+
+    db.commit()
+
+    delivery = send_registration_otp(email, username, otp_code)
+    return build_otp_response(email, otp_code, delivery)
+
+
+@app.post("/register/resend-otp")
+def resend_registration_otp(user: UserCreate, db: Session = Depends(get_db)):
+    return request_registration_otp(user, db)
 
 
 @app.post("/login")
 def login(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.username == user.username).first()
+    username = normalize_username(user.username)
+    db_user = db.query(User).filter(User.username == username).first()
     if not db_user or not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_access_token({"sub": db_user.username})

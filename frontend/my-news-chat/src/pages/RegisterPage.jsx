@@ -1,222 +1,329 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { useNavigate, Link } from "react-router-dom";
-import { API_CONFIG } from '../constants/config';
+import { Link, useNavigate } from "react-router-dom";
+import { API_CONFIG } from "../constants/config";
+import styles from "./RegisterPage.module.css";
+
+const initialFormState = {
+  username: "",
+  email: "",
+  password: "",
+};
+
+const PASSWORD_REQUIREMENTS = [
+  "Use at least 12 characters.",
+  "Avoid common passwords such as password123 or 123456789.",
+  "Do not include your username or email.",
+  "Use a mix of uppercase, lowercase, numbers, and symbols.",
+];
+
+function getErrorMessage(error, fallbackMessage) {
+  return error.response?.data?.detail || fallbackMessage;
+}
+
+function getPasswordValidation(password, username, email) {
+  const normalizedPassword = password.toLowerCase();
+  const compactPassword = normalizedPassword.replace(/[^a-z0-9]/g, "");
+  const personalTokens = `${username} ${email}`
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 3);
+
+  const commonPasswords = new Set([
+    "123456",
+    "12345678",
+    "123456789",
+    "1234567890",
+    "abc123",
+    "admin123",
+    "letmein",
+    "passw0rd",
+    "password",
+    "password1",
+    "password123",
+    "qwerty",
+    "qwerty123",
+    "welcome",
+  ]);
+
+  if (password.length < 12) {
+    return "Password must be at least 12 characters long.";
+  }
+
+  if (!password.trim()) {
+    return "Password cannot be empty or only spaces.";
+  }
+
+  if (commonPasswords.has(normalizedPassword) || commonPasswords.has(compactPassword)) {
+    return "Password is too common. Choose a more unique password.";
+  }
+
+  if (personalTokens.some((token) => compactPassword.includes(token))) {
+    return "Password must not contain your username or email.";
+  }
+
+  if (/^(.)\1{7,}$/.test(password)) {
+    return "Password cannot repeat the same character many times.";
+  }
+
+  const hasLower = /[a-z]/.test(password);
+  const hasUpper = /[A-Z]/.test(password);
+  const hasDigit = /\d/.test(password);
+  const hasSymbol = /[^A-Za-z0-9]/.test(password);
+
+  if ([hasLower, hasUpper, hasDigit, hasSymbol].filter(Boolean).length < 3) {
+    return "Password should use at least three of these: lowercase, uppercase, numbers, symbols.";
+  }
+
+  return "";
+}
 
 /**
- * RegisterPage Component - User registration page
- * Handles registration form submission and redirects to login
- * Styled to match news chat theme
+ * RegisterPage Component - Two-step signup with OTP verification
  */
 export default function RegisterPage() {
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [formData, setFormData] = useState(initialFormState);
+  const [otp, setOtp] = useState("");
+  const [step, setStep] = useState("details");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [debugOtp, setDebugOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const redirectTimeoutRef = useRef(null);
   const navigate = useNavigate();
+  const passwordError = getPasswordValidation(
+    formData.password,
+    formData.username,
+    formData.email
+  );
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  useEffect(() => {
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleChange = (field) => (event) => {
+    setFormData((current) => ({
+      ...current,
+      [field]: event.target.value,
+    }));
+  };
+
+  const requestOtp = async (endpoint = "/register/request-otp") => {
+    const response = await axios.post(
+      `${API_CONFIG.BACKEND_URL}${endpoint}`,
+      formData,
+      { headers: { "Content-Type": "application/json" } }
+    );
+
+    const detailMessage =
+      response.data.delivery === "debug"
+        ? "OTP generated in debug mode. Use the code below or check the API logs."
+        : `We sent a verification code to ${response.data.email}.`;
+
+    setStep("otp");
+    setOtp("");
+    setDebugOtp(response.data.debug_otp || "");
+    setSuccess(`${response.data.message} ${detailMessage}`);
+  };
+
+  const verifyOtp = async () => {
+    await axios.post(
+      `${API_CONFIG.BACKEND_URL}/register`,
+      {
+        username: formData.username,
+        email: formData.email,
+        otp,
+      },
+      { headers: { "Content-Type": "application/json" } }
+    );
+
+    setSuccess("Account verified and created successfully! Redirecting to login...");
+
+    redirectTimeoutRef.current = setTimeout(() => {
+      navigate("/login");
+    }, 1500);
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError("");
     setSuccess("");
+
+    if (step === "details" && passwordError) {
+      setError(passwordError);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      await axios.post(
-        `${API_CONFIG.BACKEND_URL}/register`,
-        { username, email, password },
-        { headers: { "Content-Type": "application/json" } }
-      );
-      setSuccess("Registered successfully! Redirecting to login...");
-      setTimeout(() => navigate("/login"), 1500);
+      if (step === "details") {
+        await requestOtp();
+        return;
+      }
+
+      await verifyOtp();
     } catch (err) {
-      setError(err.response?.data?.detail || "Registration failed");
+      setError(getErrorMessage(err, "Registration failed"));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const containerStyle = {
-    display: 'flex',
-    minHeight: '100vh',
-    background: '#f8fafc',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontFamily: '"Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    padding: '24px'
+  const handleResendOtp = async () => {
+    setError("");
+    setSuccess("");
+    setIsLoading(true);
+
+    try {
+      await requestOtp("/register/resend-otp");
+    } catch (err) {
+      setError(getErrorMessage(err, "Unable to resend verification code"));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const cardStyle = {
-    background: '#fff',
-    padding: '48px',
-    borderRadius: '0px',
-    border: '4px solid #000',
-    maxWidth: '400px',
-    width: '100%',
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)'
-  };
-
-  const headerStyle = {
-    fontSize: '28px',
-    fontWeight: '900',
-    letterSpacing: '-1px',
-    marginBottom: '8px',
-    color: '#111827',
-    textTransform: 'uppercase',
-    margin: '0 0 24px 0'
-  };
-
-  const subtitleStyle = {
-    fontSize: '12px',
-    fontWeight: 'bold',
-    opacity: 0.6,
-    marginBottom: '32px',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    color: '#666'
-  };
-
-  const inputStyle = {
-    width: '100%',
-    padding: '12px 16px',
-    border: '2px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontFamily: 'inherit',
-    marginBottom: '12px',
-    boxSizing: 'border-box',
-    transition: 'all 0.2s',
-    backgroundColor: '#fff'
-  };
-
-  const buttonStyle = {
-    width: '100%',
-    padding: '12px 16px',
-    border: '2px solid #000',
-    borderRadius: '6px',
-    background: '#000',
-    color: '#fff',
-    cursor: isLoading ? 'not-allowed' : 'pointer',
-    fontWeight: '700',
-    fontSize: '14px',
-    transition: 'all 0.2s',
-    textTransform: 'uppercase',
-    fontFamily: 'inherit',
-    letterSpacing: '0.5px',
-    opacity: isLoading ? 0.7 : 1,
-    marginTop: '8px'
-  };
-
-  const errorStyle = {
-    color: '#dc2626',
-    fontSize: '13px',
-    padding: '10px 12px',
-    background: '#fee2e2',
-    border: '1px solid #fca5a5',
-    borderRadius: '4px',
-    marginBottom: '16px',
-    fontWeight: '500'
-  };
-
-  const successStyle = {
-    color: '#059669',
-    fontSize: '13px',
-    padding: '10px 12px',
-    background: '#d1fae5',
-    border: '1px solid #6ee7b7',
-    borderRadius: '4px',
-    marginBottom: '16px',
-    fontWeight: '500'
-  };
-
-  const linkStyle = {
-    color: '#000',
-    textDecoration: 'none',
-    fontWeight: '700',
-    borderBottom: '2px solid #000',
-    transition: 'all 0.2s'
-  };
-
-  const footerStyle = {
-    marginTop: '24px',
-    paddingTop: '24px',
-    borderTop: '2px solid #e5e7eb',
-    fontSize: '13px',
-    color: '#666',
-    textAlign: 'center'
+  const handleEditDetails = () => {
+    setStep("details");
+    setOtp("");
+    setDebugOtp("");
+    setError("");
+    setSuccess("");
   };
 
   return (
-    <div style={containerStyle}>
-      <div style={cardStyle}>
-        <h1 style={headerStyle}>INTEL_CORE</h1>
-        <p style={subtitleStyle}>Create Account</p>
+    <div className={styles.container}>
+      <div className={styles.card}>
+        <h1 className={styles.header}>INTEL_CORE</h1>
+        <p className={styles.subtitle}>
+          {step === "details" ? "Create Account" : "Verify Signup"}
+        </p>
 
-        {error && <div style={errorStyle}>{error}</div>}
-        {success && <div style={successStyle}>{success}</div>}
+        {error && (
+          <div className={styles.error} role="alert">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className={styles.success} aria-live="polite">
+            {success}
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit}>
-          <input
-            placeholder="USERNAME"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            disabled={isLoading}
-            style={inputStyle}
-            onFocus={(e) => (e.target.style.borderColor = '#000')}
-            onBlur={(e) => (e.target.style.borderColor = '#ddd')}
-            required
-          />
-          <input
-            type="email"
-            placeholder="EMAIL ADDRESS"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={isLoading}
-            style={inputStyle}
-            onFocus={(e) => (e.target.style.borderColor = '#000')}
-            onBlur={(e) => (e.target.style.borderColor = '#ddd')}
-            required
-          />
-          <input
-            type="password"
-            placeholder="PASSWORD"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={isLoading}
-            style={inputStyle}
-            onFocus={(e) => (e.target.style.borderColor = '#000')}
-            onBlur={(e) => (e.target.style.borderColor = '#ddd')}
-            required
-          />
+        {step === "otp" && (
+          <div className={styles.infoBox}>
+            Verifying <strong>{formData.email}</strong>. Enter the OTP to finish
+            creating your account.
+          </div>
+        )}
+
+        {debugOtp && step === "otp" && (
+          <div className={styles.debugBox}>
+            Debug OTP: <strong>{debugOtp}</strong>
+          </div>
+        )}
+
+        <form className={styles.form} onSubmit={handleSubmit}>
+          {step === "details" ? (
+            <>
+              <input
+                placeholder="USERNAME"
+                value={formData.username}
+                onChange={handleChange("username")}
+                disabled={isLoading}
+                className={styles.input}
+                autoComplete="username"
+                required
+              />
+              <input
+                type="email"
+                placeholder="EMAIL ADDRESS"
+                value={formData.email}
+                onChange={handleChange("email")}
+                disabled={isLoading}
+                className={styles.input}
+                autoComplete="email"
+                required
+              />
+              <input
+                type="password"
+                placeholder="PASSWORD"
+                value={formData.password}
+                onChange={handleChange("password")}
+                disabled={isLoading}
+                className={styles.input}
+                autoComplete="new-password"
+                required
+              />
+              <div className={styles.passwordPanel}>
+                <div className={styles.passwordHeading}>Password requirements</div>
+                <ul className={styles.passwordList}>
+                  {PASSWORD_REQUIREMENTS.map((requirement) => (
+                    <li key={requirement}>{requirement}</li>
+                  ))}
+                </ul>
+                {formData.password && passwordError && (
+                  <div className={styles.passwordError}>{passwordError}</div>
+                )}
+              </div>
+            </>
+          ) : (
+            <input
+              placeholder="ENTER OTP"
+              value={otp}
+              onChange={(event) => setOtp(event.target.value)}
+              disabled={isLoading}
+              className={styles.input}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              required
+            />
+          )}
+
           <button
             type="submit"
-            disabled={isLoading}
-            style={buttonStyle}
-            onMouseEnter={(e) => {
-              e.target.style.background = '#111827';
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = '0px 4px 8px rgba(0, 0, 0, 0.2)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = '#000';
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = 'none';
-            }}
+            disabled={isLoading || (step === "details" && !!passwordError)}
+            className={styles.button}
           >
-            {isLoading ? "CREATING ACCOUNT..." : "REGISTER"}
+            {isLoading
+              ? step === "details"
+                ? "SENDING OTP..."
+                : "VERIFYING OTP..."
+              : step === "details"
+                ? "SEND OTP"
+                : "VERIFY & CREATE ACCOUNT"}
           </button>
         </form>
 
-        <div style={footerStyle}>
+        {step === "otp" && (
+          <div className={styles.actionRow}>
+            <button
+              type="button"
+              onClick={handleResendOtp}
+              disabled={isLoading}
+              className={`${styles.button} ${styles.secondaryButton}`}
+            >
+              RESEND OTP
+            </button>
+            <button
+              type="button"
+              onClick={handleEditDetails}
+              disabled={isLoading}
+              className={`${styles.button} ${styles.secondaryButton}`}
+            >
+              EDIT DETAILS
+            </button>
+          </div>
+        )}
+
+        <div className={styles.footer}>
           Already have an account?{" "}
-          <Link
-            to="/login"
-            style={linkStyle}
-            onMouseEnter={(e) => (e.target.style.opacity = '0.7')}
-            onMouseLeave={(e) => (e.target.style.opacity = '1')}
-          >
+          <Link to="/login" className={styles.link}>
             Sign In
           </Link>
         </div>

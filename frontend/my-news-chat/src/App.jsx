@@ -4,83 +4,95 @@ import ChatPage from "./pages/ChatPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import AnalysisPage from "./pages/AnalysisPage";
-import { useState, useEffect } from "react";
-import { STORAGE_KEYS } from "./constants/config";
+import { useCallback, useState } from "react";
+import useAuth from "./hooks/useAuth";
+import useChatMessages from "./hooks/useChatMessages";
+
+function ProtectedRoute({ isAuthenticated, children }) {
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
+}
 
 function App() {
-  const [messages, setMessages] = useState([]);
-  const [token, setToken] = useState(localStorage.getItem(STORAGE_KEYS.TOKEN) || null);
+  const { token, setToken, logout } = useAuth();
+  const { messages, setMessages, clearAllMessages } = useChatMessages();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const isAuthenticated = Boolean(token);
 
-  // Load messages from localStorage on mount
-  useEffect(() => {
-    const savedMessages = localStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES);
-    if (savedMessages) setMessages(JSON.parse(savedMessages));
-  }, []);
-
-  // Save messages to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CHAT_MESSAGES, JSON.stringify(messages));
-  }, [messages]);
-
-  // Private Route wrapper
-  const PrivateRoute = ({ children }) => {
-    return token ? children : <Navigate to="/login" replace />;
-  };
+  const handleLogout = useCallback(() => {
+    clearAllMessages();
+    logout();
+  }, [clearAllMessages, logout]);
 
   return (
     <BrowserRouter>
       <div style={{ display: "flex", minHeight: "100vh" }}>
-        {token && <Sidebar setToken={setToken} isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />}
-        <div style={{ 
-          flex: 1, 
-          display: "flex", 
-          flexDirection: "column", 
-          overflow: "auto",
-          marginLeft: token ? (isCollapsed ? '80px' : '260px') : '0px',
-          transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-        }}>
+        {isAuthenticated && (
+          <Sidebar
+            onLogout={handleLogout}
+            isCollapsed={isCollapsed}
+            setIsCollapsed={setIsCollapsed}
+          />
+        )}
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "auto",
+            marginLeft: isAuthenticated ? (isCollapsed ? "80px" : "260px") : "0px",
+            transition: "margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+        >
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<LoginPage setToken={setToken} />} />
             <Route path="/register" element={<RegisterPage />} />
 
             {/* Private Routes */}
-            <Route 
-              path="/" 
+            <Route
+              path="/"
               element={
-                <PrivateRoute>
-                  <ChatPage messages={messages} setMessages={setMessages} />
-                </PrivateRoute>
-              } 
+                <ProtectedRoute isAuthenticated={isAuthenticated}>
+                  <ChatPage
+                    messages={messages}
+                    setMessages={setMessages}
+                    token={token}
+                  />
+                </ProtectedRoute>
+              }
             />
-            <Route 
-              path="/analysis" 
+            <Route
+              path="/analysis"
               element={
-                <PrivateRoute>
+                <ProtectedRoute isAuthenticated={isAuthenticated}>
                   <AnalysisPage />
-                </PrivateRoute>
-              } 
+                </ProtectedRoute>
+              }
             />
-            <Route 
-              path="/archive" 
+            <Route
+              path="/archive"
               element={
-                <PrivateRoute>
+                <ProtectedRoute isAuthenticated={isAuthenticated}>
                   <h1>Archive Page</h1>
-                </PrivateRoute>
-              } 
+                </ProtectedRoute>
+              }
             />
-            <Route 
-              path="/system" 
+            <Route
+              path="/system"
               element={
-                <PrivateRoute>
+                <ProtectedRoute isAuthenticated={isAuthenticated}>
                   <h1>System Page</h1>
-                </PrivateRoute>
-              } 
+                </ProtectedRoute>
+              }
             />
 
             {/* Catch-all redirect */}
-            <Route path="*" element={token ? <Navigate to="/" /> : <Navigate to="/login" />} />
+            <Route
+              path="*"
+              element={
+                isAuthenticated ? <Navigate to="/" replace /> : <Navigate to="/login" replace />
+              }
+            />
           </Routes>
         </div>
       </div>

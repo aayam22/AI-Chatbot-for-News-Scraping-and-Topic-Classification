@@ -1,20 +1,21 @@
 import PropTypes from 'prop-types';
 import { useMemo } from 'react';
-import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import { Bar, Doughnut, Line } from 'react-chartjs-2';
 
 /**
  * ChartsSection - Displays analytics charts
  * Uses useMemo to optimize chart data recalculation
  */
 function ChartsSection({ analysisData, chartOptions }) {
-  const timeSeriesData = analysisData?.time_series || {};
-  const topCategories = analysisData?.top_categories || [];
-  const topSources = analysisData?.top_sources || [];
+  const timeSeriesData = analysisData?.time_series;
+  const topCategories = analysisData?.top_categories;
+  const topSources = analysisData?.top_sources;
 
   // Memoize chart data to prevent unnecessary recalculations
   const lineChartData = useMemo(() => {
-    const timeSeriesDates = Object.keys(timeSeriesData);
-    const timeSeriesCounts = Object.values(timeSeriesData);
+    const safeTimeSeriesData = timeSeriesData ?? {};
+    const timeSeriesDates = Object.keys(safeTimeSeriesData);
+    const timeSeriesCounts = Object.values(safeTimeSeriesData);
 
     return {
       labels: timeSeriesDates,
@@ -36,40 +37,53 @@ function ChartsSection({ analysisData, chartOptions }) {
     };
   }, [timeSeriesData]);
 
-  const categoryChartData = useMemo(() => ({
-    labels: topCategories.map((c) => c.name),
-    datasets: [
-      {
-        label: 'Articles by Predicted Topic',
-        data: topCategories.map((c) => c.count),
-        backgroundColor: [
-          'rgba(0, 0, 0, 0.9)',
-          'rgba(0, 0, 0, 0.75)',
-          'rgba(0, 0, 0, 0.6)',
-          'rgba(0, 0, 0, 0.45)',
-          'rgba(0, 0, 0, 0.3)',
-        ],
-        borderColor: '#000',
-        borderWidth: 2,
-      },
-    ],
-  }), [topCategories]);
+  const categoryChartData = useMemo(() => {
+    const safeTopCategories = topCategories ?? [];
 
-  const sourceChartData = useMemo(() => ({
-    labels: topSources.slice(0, 5).map((s) => s.name),
-    datasets: [
-      {
-        label: 'Top Sources',
-        data: topSources.slice(0, 5).map((s) => s.count),
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        borderColor: '#000',
-        borderWidth: 2,
-      },
-    ],
-  }), [topSources]);
+    return {
+      labels: safeTopCategories.map((category) => category.name),
+      datasets: [
+        {
+          label: 'Articles by Predicted Topic',
+          data: safeTopCategories.map((category) => category.count),
+          backgroundColor: [
+            'rgba(0, 0, 0, 0.9)',
+            'rgba(0, 0, 0, 0.75)',
+            'rgba(0, 0, 0, 0.6)',
+            'rgba(0, 0, 0, 0.45)',
+            'rgba(0, 0, 0, 0.3)',
+          ],
+          borderColor: '#000',
+          borderWidth: 2,
+        },
+      ],
+    };
+  }, [topCategories]);
 
-  const timeSeriesDates = Object.keys(timeSeriesData);
-  const hasData = timeSeriesDates.length > 0 || topCategories.length > 0 || topSources.length > 0;
+  const sourceChartData = useMemo(() => {
+    const safeTopSources = topSources ?? [];
+
+    return {
+      labels: safeTopSources.slice(0, 5).map((source) => source.name),
+      datasets: [
+        {
+          label: 'Top Sources',
+          data: safeTopSources.slice(0, 5).map((source) => source.count),
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          borderColor: '#000',
+          borderWidth: 2,
+        },
+      ],
+    };
+  }, [topSources]);
+
+  const safeTopCategories = topCategories ?? [];
+  const safeTopSources = topSources ?? [];
+  const timeSeriesDates = Object.keys(timeSeriesData ?? {});
+  const hasData =
+    timeSeriesDates.length > 0 ||
+    safeTopCategories.length > 0 ||
+    safeTopSources.length > 0;
 
   const chartsGridStyle = {
     display: 'grid',
@@ -110,14 +124,14 @@ function ChartsSection({ analysisData, chartOptions }) {
     <div style={chartsGridStyle}>
       {timeSeriesDates.length > 0 && (
         <div style={chartCardStyle}>
-          <h3 style={chartTitleStyle}>📈 Articles Over Time</h3>
+          <h3 style={chartTitleStyle}>Articles Over Time</h3>
           <Line data={lineChartData} options={chartOptions} />
         </div>
       )}
 
-      {topCategories.length > 0 && (
+      {safeTopCategories.length > 0 && (
         <div style={chartCardStyle}>
-          <h3 style={chartTitleStyle}>🎯 Top Predicted Topics</h3>
+          <h3 style={chartTitleStyle}>Top Predicted Topics</h3>
           <Doughnut
             data={categoryChartData}
             options={{
@@ -131,16 +145,16 @@ function ChartsSection({ analysisData, chartOptions }) {
         </div>
       )}
 
-      {topSources.length > 0 && (
+      {safeTopSources.length > 0 && (
         <div style={chartCardStyle}>
-          <h3 style={chartTitleStyle}>📡 Top News Sources</h3>
+          <h3 style={chartTitleStyle}>Top News Sources</h3>
           <Bar data={sourceChartData} options={chartOptions} />
         </div>
       )}
 
       {!hasData && (
         <div style={noDataStyle}>
-          ⚠️ No data available for the selected filters
+          No data available for the selected filters
         </div>
       )}
     </div>
