@@ -16,7 +16,11 @@ from collections import Counter
 import os
 
 # ✅ Import RAG module with chat_history
-from rag_with_sambanova import init_rag, query_rag, chat_history
+from rag_with_sambanova import (
+    init_rag, query_rag, chat_history,
+    get_latest_news, get_trending_topics, 
+    get_news_statistics, get_news_by_date_range
+)
 
 # ----------------------------
 # CONFIG
@@ -67,6 +71,16 @@ class UserLogin(BaseModel):
 
 class QueryRequest(BaseModel):
     question: str
+
+class DateRangeRequest(BaseModel):
+    start_date: str
+    end_date: str
+    category: str = None
+
+class LatestNewsRequest(BaseModel):
+    days: int = 1
+    category: str = None
+    limit: int = 5
 
 class AnalysisResponse(BaseModel):
     total_articles: int
@@ -320,6 +334,84 @@ def get_analysis(date_from: str = None, date_to: str = None, category: str = Non
     """
     stats = get_article_statistics(date_from, date_to, category, source)
     return stats
+
+# ========================================
+# NEW ENDPOINTS FOR ENHANCED RAG FEATURES
+# ========================================
+
+@app.post("/latest-news")
+def get_latest_news_endpoint(req: LatestNewsRequest, current_user: str = Depends(get_current_user)):
+    """
+    Get latest news with optional category filter
+    - days: Number of days to look back (1=today, 7=this week, 30=this month)
+    - category: Optional category filter
+    - limit: Max articles to return
+    """
+    try:
+        articles = get_latest_news(days=req.days, category=req.category, limit=req.limit)
+        return {
+            "status": "success",
+            "count": len(articles),
+            "articles": articles
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/trending-topics")
+def get_trending_topics_endpoint(days: int = 7, top_n: int = 10):
+    """
+    Get trending topics based on article frequency
+    - days: Analyze articles from last N days
+    - top_n: Number of top trends to return
+    """
+    try:
+        trending = get_trending_topics(days=days, top_n=top_n)
+        return {
+            "status": "success",
+            "time_period_days": days,
+            "trending_topics": trending
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/statistics")
+def get_statistics_endpoint(days: int = 30):
+    """
+    Get news statistics for specified time period
+    - days: Number of days to analyze
+    """
+    try:
+        stats = get_news_statistics(days=days)
+        return {
+            "status": "success",
+            "time_period_days": days,
+            **stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/news-by-date-range")
+def get_news_by_date_range_endpoint(req: DateRangeRequest):
+    """
+    Get articles within a specific date range
+    - start_date: YYYY-MM-DD format
+    - end_date: YYYY-MM-DD format
+    - category: Optional category filter
+    """
+    try:
+        articles = get_news_by_date_range(req.start_date, req.end_date, req.category)
+        return {
+            "status": "success",
+            "date_range": f"{req.start_date} to {req.end_date}",
+            "category_filter": req.category,
+            "count": len(articles),
+            "articles": articles
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ----------------------------
 # HEALTH CHECK
