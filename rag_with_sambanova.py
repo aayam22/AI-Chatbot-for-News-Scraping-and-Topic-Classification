@@ -330,7 +330,7 @@ def build_enhanced_context(docs, max_chars=700):
 # ========================================
 # IMPROVED: Message Building
 # ========================================
-def build_messages(query, context, include_summary=False):
+def build_messages(query, context, conversation_history=None, include_summary=False):
     """Build chat messages with enhanced system prompt"""
     messages = [
         {
@@ -349,9 +349,11 @@ def build_messages(query, context, include_summary=False):
             )
         }
     ]
-    
-    # Add last 3 chat history for context
-    for chat in chat_history[-3:]:
+
+    history = conversation_history if conversation_history is not None else chat_history
+
+    # Add recent chat history for context
+    for chat in history[-3:]:
         messages.append({"role": "user", "content": chat["user"]})
         messages.append({"role": "assistant", "content": chat["assistant"]})
     
@@ -366,7 +368,7 @@ def build_messages(query, context, include_summary=False):
 # ========================================
 # ENHANCED: Main Query Function
 # ========================================
-def query_rag(query: str, max_chars=700, top_k=10, use_date_filter=True):
+def query_rag(query: str, conversation_history=None, max_chars=700, top_k=10, use_date_filter=True):
     """
     Enhanced query function with date filtering and better formatting
     
@@ -421,7 +423,7 @@ def query_rag(query: str, max_chars=700, top_k=10, use_date_filter=True):
         context = build_enhanced_context(docs, max_chars)
 
         # Build messages and call LLM
-        messages = build_messages(query, context)
+        messages = build_messages(query, context, conversation_history=conversation_history)
 
         response = client.chat.completions.create(
             model=llm_model,
@@ -431,10 +433,11 @@ def query_rag(query: str, max_chars=700, top_k=10, use_date_filter=True):
 
         answer = response.choices[0].message.content.strip() or "⚠️ Could not generate an answer."
 
-        # Update chat history
-        chat_history.append({"user": query, "assistant": answer})
-        if len(chat_history) > 10:
-            chat_history.pop(0)
+        # Keep the interactive CLI history working when no explicit conversation is passed in.
+        if conversation_history is None:
+            chat_history.append({"user": query, "assistant": answer})
+            if len(chat_history) > 10:
+                chat_history.pop(0)
 
         # Prepare sources with formatted dates
         sources = []

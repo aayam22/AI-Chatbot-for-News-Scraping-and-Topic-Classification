@@ -144,6 +144,9 @@ ENV/
 env.bak/
 venv.bak/
 myenv_gpu/
+e2e_users.db
+frontend/my-news-chat/playwright-report/
+frontend/my-news-chat/test-results/
 
 # Spyder project settings
 .spyderproject

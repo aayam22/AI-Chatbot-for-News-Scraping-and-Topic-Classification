@@ -6,7 +6,7 @@ import { UI_MESSAGES } from '../constants/messages';
  * Custom hook for chat operations (send question, clear chat)
  * Handles API calls and message state updates
  */
-export const useChat = (setMessages, token) => {
+export const useChat = (setMessages, token, refreshMessages) => {
   /**
    * Generate unique message ID
    */
@@ -52,6 +52,10 @@ export const useChat = (setMessages, token) => {
         setMessages(prev =>
           prev.map(msg => (msg.id === loadingMsgId ? assistantMsg : msg))
         );
+
+        if (refreshMessages) {
+          await refreshMessages();
+        }
       } else {
         // Show error message
         setMessages(prev =>
@@ -67,7 +71,7 @@ export const useChat = (setMessages, token) => {
         );
       }
     },
-    [token, setMessages, generateMessageId]
+    [token, setMessages, generateMessageId, refreshMessages]
   );
 
   /**

@@ -4,6 +4,7 @@ import ChatPage from "./pages/ChatPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import AnalysisPage from "./pages/AnalysisPage";
+import ArchivePage from "./pages/ArchivePage";
 import { useCallback, useState } from "react";
 import useAuth from "./hooks/useAuth";
 import useChatMessages from "./hooks/useChatMessages";
@@ -14,7 +15,13 @@ function ProtectedRoute({ isAuthenticated, children }) {
 
 function App() {
   const { token, setToken, logout } = useAuth();
-  const { messages, setMessages, clearAllMessages } = useChatMessages();
+  const {
+    messages,
+    setMessages,
+    clearAllMessages,
+    refreshMessages,
+    removeMessage,
+  } = useChatMessages(token);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const isAuthenticated = Boolean(token);
 
@@ -57,6 +64,7 @@ function App() {
                     messages={messages}
                     setMessages={setMessages}
                     token={token}
+                    refreshMessages={refreshMessages}
                   />
                 </ProtectedRoute>
               }
@@ -73,7 +81,11 @@ function App() {
               path="/archive"
               element={
                 <ProtectedRoute isAuthenticated={isAuthenticated}>
-                  <h1>Archive Page</h1>
+                  <ArchivePage
+                    token={token}
+                    refreshMessages={refreshMessages}
+                    removeMessage={removeMessage}
+                  />
                 </ProtectedRoute>
               }
             />

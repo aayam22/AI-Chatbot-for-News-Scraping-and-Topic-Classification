@@ -3,7 +3,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, or_
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, or_, Text, JSON, desc, asc
 from sqlalchemy.ext.declarative import declarative_base
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -26,8 +26,8 @@ except ImportError:
 
 # ✅ Import RAG module with chat_history
 from rag_with_sambanova import (
-    init_rag, query_rag, chat_history,
-    get_latest_news, get_trending_topics, 
+    init_rag, query_rag,
+    get_latest_news, get_trending_topics,
     get_news_statistics, get_news_by_date_range
 )
 
@@ -39,13 +39,22 @@ PROJECT_ROOT = os.path.abspath(os.path.join(API_DIR, ".."))
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 load_dotenv(os.path.join(API_DIR, ".env"))
 
-DATABASE_URL = "sqlite:///./users.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./users.db")
 SECRET_KEY = "super_secret_key_change_this_in_production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 OTP_EXPIRY_MINUTES = int(os.getenv("OTP_EXPIRY_MINUTES", "10"))
 OTP_LENGTH = int(os.getenv("OTP_LENGTH", "6"))
 OTP_DEBUG_MODE = os.getenv("OTP_DEBUG_MODE", "true").lower() in {"1", "true", "yes", "on"}
+E2E_FAKE_CHAT = os.getenv("E2E_FAKE_CHAT", "false").lower() in {"1", "true", "yes", "on"}
+FRONTEND_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "FRONTEND_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173",
+    ).split(",")
+    if origin.strip()
+]
 SMTP_HOST = os.getenv("SMTP_HOST")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USERNAME = os.getenv("SMTP_USERNAME")
@@ -78,6 +87,15 @@ class PendingRegistration(Base):
     otp_expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, index=True, nullable=False)
+    role = Column(String, nullable=False)  # "user" or "assistant"
+    text = Column(Text, nullable=False)
+    sources = Column(JSON, nullable=True)  # Store sources as JSON
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
 Base.metadata.create_all(bind=engine)
 
 # ----------------------------
@@ -107,6 +125,10 @@ def generate_otp() -> str:
     return str(secrets.randbelow(10 ** OTP_LENGTH)).zfill(OTP_LENGTH)
 
 def send_registration_otp(email: str, username: str, otp_code: str) -> str:
+    if E2E_FAKE_CHAT:
+        print(f"[OTP DEBUG] Verification code for {email}: {otp_code}")
+        return "debug"
+
     message = EmailMessage()
     message["Subject"] = "Your INTEL_CORE signup verification code"
     message["From"] = SMTP_FROM_EMAIL
@@ -197,6 +219,17 @@ class AnalysisResponse(BaseModel):
     top_sources: list
     category_distribution: dict
     source_distribution: dict
+
+class ChatMessageResponse(BaseModel):
+    id: int
+    role: str
+    text: str
+    sources: list = None
+    created_at: str
+
+class ChatHistoryRequest(BaseModel):
+    limit: int = 100
+    offset: int = 0
 
 # ----------------------------
 # DEPENDENCY
@@ -335,7 +368,40 @@ def get_article_statistics(date_from: str = None, date_to: str = None, category:
 # PER-USER CHAT HISTORY
 # ----------------------------
 # Map username → list of messages
-user_chat_memory = {}
+def get_recent_conversation_history(db: Session, username: str, max_turns: int = 3):
+    """
+    Build recent user/assistant turns for prompt context from persisted chat history.
+    """
+    recent_messages = db.query(ChatMessage).filter(
+        ChatMessage.username == username
+    ).order_by(desc(ChatMessage.created_at), desc(ChatMessage.id)).limit(max_turns * 2).all()
+
+    recent_messages = list(reversed(recent_messages))
+    conversation_history = []
+    pending_user_message = None
+
+    for message in recent_messages:
+        if message.role == "user":
+            pending_user_message = message.text
+        elif message.role == "assistant" and pending_user_message:
+            conversation_history.append({
+                "user": pending_user_message,
+                "assistant": message.text
+            })
+            pending_user_message = None
+
+    return conversation_history
+
+
+def build_fake_chat_response(question: str, conversation_history: list[dict]):
+    """
+    Deterministic response for browser E2E tests that should not hit the real RAG stack.
+    """
+    history_turns = len(conversation_history)
+    return {
+        "answer": f"E2E answer ({history_turns} prior turns): {question}",
+        "sources": [],
+    }
 
 # ----------------------------
 # LIFESPAN HANDLER (RAG Init)
@@ -350,6 +416,14 @@ async def lifespan(app: FastAPI):
 # ----------------------------
 # FASTAPI APP
 # ----------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Initializing RAG system...")
+    if not E2E_FAKE_CHAT:
+        init_rag()
+    yield
+    print("Shutting down app...")
+
 app = FastAPI(title="Unified Auth + RAG API with Per-User Chat", lifespan=lifespan)
 
 # ----------------------------
@@ -357,7 +431,7 @@ app = FastAPI(title="Unified Auth + RAG API with Per-User Chat", lifespan=lifesp
 # ----------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=FRONTEND_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -490,21 +564,37 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
 # PROTECTED CHAT ROUTES
 # ----------------------------
 @app.post("/ask")
-def ask_question(req: QueryRequest, current_user: str = Depends(get_current_user)):
-    # Initialize per-user memory if not exists
-    if current_user not in user_chat_memory:
-        user_chat_memory[current_user] = []
-
+def ask_question(req: QueryRequest, current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
-        # Query RAG (this also updates chat_history internally)
-        rag_result = query_rag(req.question)
+        conversation_history = get_recent_conversation_history(db, current_user)
 
-        # Update per-user memory
-        user_chat_memory[current_user].append({
-            "question": req.question, 
-            "answer": rag_result["answer"],
-            "sources": rag_result["sources"]
-        })
+        # Save user message to database
+        user_msg = ChatMessage(
+            username=current_user,
+            role="user",
+            text=req.question,
+            sources=None
+        )
+        db.add(user_msg)
+        db.commit()
+
+        # Query RAG with this user's persisted conversation context.
+        # In browser E2E mode we stub the answer so tests stay deterministic and offline-safe.
+        rag_result = (
+            build_fake_chat_response(req.question, conversation_history)
+            if E2E_FAKE_CHAT
+            else query_rag(req.question, conversation_history=conversation_history)
+        )
+
+        # Save assistant message to database
+        assistant_msg = ChatMessage(
+            username=current_user,
+            role="assistant",
+            text=rag_result["answer"],
+            sources=rag_result["sources"]
+        )
+        db.add(assistant_msg)
+        db.commit()
 
         return {
             "answer": rag_result["answer"],
@@ -516,10 +606,98 @@ def ask_question(req: QueryRequest, current_user: str = Depends(get_current_user
 
 
 @app.post("/clear-memory")
-def clear_memory(current_user: str = Depends(get_current_user)):
-    # Clear only this user's memory
-    user_chat_memory[current_user] = []
+def clear_memory(current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Clear all messages from database for this user
+    db.query(ChatMessage).filter(ChatMessage.username == current_user).delete(synchronize_session=False)
+    db.commit()
+    
     return {"status": "Memory cleared", "user": current_user}
+
+# ----------------------------
+# CHAT HISTORY ROUTES
+# ----------------------------
+@app.get("/chat-history")
+def get_chat_history(current_user: str = Depends(get_current_user), db: Session = Depends(get_db), limit: int = 100, offset: int = 0):
+    """
+    Get all chat messages for the current user, ordered by timestamp (newest first)
+    """
+    try:
+        messages = db.query(ChatMessage).filter(
+            ChatMessage.username == current_user
+        ).order_by(desc(ChatMessage.created_at), desc(ChatMessage.id)).offset(offset).limit(limit).all()
+        
+        # Reverse to get chronological order (oldest first)
+        messages = list(reversed(messages))
+        
+        return {
+            "status": "success",
+            "count": len(messages),
+            "messages": [
+                {
+                    "id": msg.id,
+                    "role": msg.role,
+                    "text": msg.text,
+                    "sources": msg.sources,
+                    "created_at": msg.created_at.isoformat()
+                }
+                for msg in messages
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/chat-history/{message_id}")
+def delete_chat_message(message_id: int, current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Delete a specific chat message (only if it belongs to current user)
+    """
+    try:
+        message = db.query(ChatMessage).filter(
+            ChatMessage.id == message_id,
+            ChatMessage.username == current_user
+        ).first()
+        
+        if not message:
+            raise HTTPException(status_code=404, detail="Message not found")
+        
+        db.delete(message)
+        db.commit()
+        
+        return {"status": "Message deleted", "message_id": message_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/chat-history/stats")
+def get_chat_statistics(current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Get chat statistics for current user
+    """
+    try:
+        total_messages = db.query(ChatMessage).filter(ChatMessage.username == current_user).count()
+        user_messages = db.query(ChatMessage).filter(
+            ChatMessage.username == current_user,
+            ChatMessage.role == "user"
+        ).count()
+        assistant_messages = total_messages - user_messages
+        
+        first_message = db.query(ChatMessage).filter(
+            ChatMessage.username == current_user
+        ).order_by(asc(ChatMessage.created_at), asc(ChatMessage.id)).first()
+        
+        last_message = db.query(ChatMessage).filter(
+            ChatMessage.username == current_user
+        ).order_by(desc(ChatMessage.created_at), desc(ChatMessage.id)).first()
+        
+        return {
+            "status": "success",
+            "total_messages": total_messages,
+            "user_messages": user_messages,
+            "assistant_messages": assistant_messages,
+            "first_message": first_message.created_at.isoformat() if first_message else None,
+            "last_message": last_message.created_at.isoformat() if last_message else None
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ----------------------------
 # ANALYSIS ROUTES
