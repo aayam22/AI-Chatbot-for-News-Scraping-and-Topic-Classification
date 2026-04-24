@@ -436,7 +436,7 @@ def query_rag(query: str, conversation_history=None, max_chars=700, top_k=10, us
         # Keep the interactive CLI history working when no explicit conversation is passed in.
         if conversation_history is None:
             chat_history.append({"user": query, "assistant": answer})
-            if len(chat_history) > 10:
+            if len(chat_history) > 15:
                 chat_history.pop(0)
 
         # Prepare sources with formatted dates

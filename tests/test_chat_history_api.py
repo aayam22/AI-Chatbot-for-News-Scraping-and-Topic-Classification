@@ -88,6 +88,71 @@ class ChatHistoryApiTests(unittest.TestCase):
         self.assertEqual(saved_messages[-2].text, "New Alice question")
         self.assertEqual(saved_messages[-1].text, "Fresh answer")
 
+    def test_ask_uses_latest_fifteen_turns_for_current_user_only(self):
+        client, SessionLocal = build_test_client(current_user="alice")
+
+        with SessionLocal() as db:
+            for turn in range(1, 17):
+                db.add(
+                    app_server.ChatMessage(
+                        username="alice",
+                        role="user",
+                        text=f"Alice question {turn}",
+                        sources=None,
+                    )
+                )
+                db.add(
+                    app_server.ChatMessage(
+                        username="alice",
+                        role="assistant",
+                        text=f"Alice answer {turn}",
+                        sources=[],
+                    )
+                )
+
+            for turn in range(1, 6):
+                db.add(
+                    app_server.ChatMessage(
+                        username="bob",
+                        role="user",
+                        text=f"Bob question {turn}",
+                        sources=None,
+                    )
+                )
+                db.add(
+                    app_server.ChatMessage(
+                        username="bob",
+                        role="assistant",
+                        text=f"Bob answer {turn}",
+                        sources=[],
+                    )
+                )
+
+            db.commit()
+
+        captured = {}
+
+        def fake_query_rag(question, conversation_history=None, **kwargs):
+            captured["conversation_history"] = conversation_history
+            return {"answer": "Latest 15 only", "sources": []}
+
+        with patch.object(app_server, "query_rag", side_effect=fake_query_rag):
+            response = client.post("/ask", json={"question": "Limit check"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(captured["conversation_history"]), 15)
+        self.assertEqual(
+            captured["conversation_history"][0],
+            {"user": "Alice question 2", "assistant": "Alice answer 2"},
+        )
+        self.assertEqual(
+            captured["conversation_history"][-1],
+            {"user": "Alice question 16", "assistant": "Alice answer 16"},
+        )
+        self.assertTrue(
+            all("Bob" not in turn["user"] and "Bob" not in turn["assistant"] for turn in captured["conversation_history"])
+        )
+
     def test_clear_memory_removes_history_used_by_follow_up_requests(self):
         client, SessionLocal = build_test_client(current_user="alice")
 

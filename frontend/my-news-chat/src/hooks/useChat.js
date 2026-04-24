@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { askQuestion, clearChatMemory, formatAssistantMessage } from '../services/chatService';
+import { askQuestion, formatAssistantMessage } from '../services/chatService';
 import { UI_MESSAGES } from '../constants/messages';
 
 /**
@@ -75,14 +75,12 @@ export const useChat = (setMessages, token, refreshMessages) => {
   );
 
   /**
-   * Clear all chat messages
+   * Clear only the current in-page chat view.
+   * This should not remove archived server history.
    */
   const clearChat = useCallback(async () => {
-    if (!token) return;
-
-    await clearChatMemory(token);
     setMessages([]);
-  }, [token, setMessages]);
+  }, [setMessages]);
 
   return { sendQuestion, clearChat, generateMessageId };
 };

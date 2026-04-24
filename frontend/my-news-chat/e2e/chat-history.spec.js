@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 
-test("chat history persists across archive, refresh, and logout/login", async ({ page }) => {
+const BACKEND_URL = "http://127.0.0.1:8000";
+
+test("chat history persists across archive, refresh, clear, and logout/login", async ({ page, request }) => {
   const uniqueId = Date.now();
   const username = `e2e_user_${uniqueId}`;
   const email = `e2e_${uniqueId}@example.com`;
@@ -8,27 +10,27 @@ test("chat history persists across archive, refresh, and logout/login", async ({
   const question = `History flow question ${uniqueId}`;
   const answer = `E2E answer (0 prior turns): ${question}`;
 
-  await test.step("register a fresh account with debug OTP", async () => {
-    await page.goto("/register");
-    await page.getByPlaceholder("USERNAME").fill(username);
-    await page.getByPlaceholder("EMAIL ADDRESS").fill(email);
-    await page.getByPlaceholder("PASSWORD").fill(password);
-    await page.getByRole("button", { name: "SEND OTP" }).click();
+  await test.step("register a fresh account through the API", async () => {
+    const otpResponse = await request.post(`${BACKEND_URL}/register/request-otp`, {
+      data: { username, email, password },
+    });
 
-    const debugOtpBox = page.getByText(/Debug OTP:/);
-    await expect(debugOtpBox).toBeVisible();
+    expect(otpResponse.ok()).toBeTruthy();
 
-    const otpText = await debugOtpBox.textContent();
-    const otp = otpText?.match(/\d{6}/)?.[0];
+    const otpPayload = await otpResponse.json();
+    const otp = otpPayload.debug_otp;
 
     expect(otp).toBeTruthy();
 
-    await page.getByPlaceholder("ENTER OTP").fill(otp);
-    await page.getByRole("button", { name: "VERIFY & CREATE ACCOUNT" }).click();
-    await page.waitForURL("**/login");
+    const registerResponse = await request.post(`${BACKEND_URL}/register`, {
+      data: { username, email, otp },
+    });
+
+    expect(registerResponse.ok()).toBeTruthy();
   });
 
   await test.step("log in and send a chat message", async () => {
+    await page.goto("/login");
     await page.getByPlaceholder("USERNAME").fill(username);
     await page.getByPlaceholder("PASSWORD").fill(password);
     await page.getByRole("button", { name: "SIGN IN" }).click();
@@ -47,10 +49,25 @@ test("chat history persists across archive, refresh, and logout/login", async ({
     await expect(page.getByText(answer, { exact: true })).toBeVisible();
   });
 
-  await test.step("open archive and delete the assistant reply", async () => {
+  await test.step("clear the feed without clearing server memory", async () => {
+    const clearMemoryRequest = page
+      .waitForRequest((req) => req.url().includes("/clear-memory"), { timeout: 1000 })
+      .catch(() => null);
+
+    await page.getByRole("button", { name: "Clear" }).click();
+
+    expect(await clearMemoryRequest).toBeNull();
+    await expect(page.getByText(question, { exact: true })).toHaveCount(0);
+    await expect(page.getByText(answer, { exact: true })).toHaveCount(0);
+
     await page.getByRole("link", { name: /archive/i }).click();
     await page.waitForURL("**/archive");
 
+    await expect(page.getByText(question, { exact: true })).toBeVisible();
+    await expect(page.getByText(answer, { exact: true })).toBeVisible();
+  });
+
+  await test.step("open archive and delete the assistant reply", async () => {
     await expect(page.getByText(question, { exact: true })).toBeVisible();
     await expect(page.getByText(answer, { exact: true })).toBeVisible();
 
