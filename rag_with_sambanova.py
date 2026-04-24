@@ -353,7 +353,7 @@ def build_messages(query, context, conversation_history=None, include_summary=Fa
     history = conversation_history if conversation_history is not None else chat_history
 
     # Add recent chat history for context
-    for chat in history[-3:]:
+    for chat in history[-15:]:
         messages.append({"role": "user", "content": chat["user"]})
         messages.append({"role": "assistant", "content": chat["assistant"]})
     

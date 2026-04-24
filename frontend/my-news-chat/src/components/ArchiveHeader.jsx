@@ -1,3 +1,5 @@
+import { formatMessageDateShort } from '../utils/dateTime';
+
 const ArchiveHeader = ({ stats }) => {
   const headerStyle = {
     borderBottom: '4px solid #000',
@@ -60,10 +62,7 @@ const ArchiveHeader = ({ stats }) => {
             <div style={statItemStyle}>
               <span style={statLabelStyle}>Since</span>
               <span style={statValueStyle}>
-                {new Date(stats.first_message).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                })}
+                {formatMessageDateShort(stats.first_message)}
               </span>
             </div>
           )}

@@ -6,6 +6,7 @@ import MessageGroup from '../components/MessageGroup';
 import ExpandedMessageModal from '../components/ExpandedMessageModal';
 import ArchiveEmptyState from '../components/ArchiveEmptyState';
 import ArchiveLoadingState from '../components/ArchiveLoadingState';
+import { buildConversationTurns, formatMessageDate, sortMessagesNewestFirst } from '../utils/dateTime';
 
 export default function ArchivePage({ token, refreshMessages, removeMessage }) {
   const [chatHistory, setChatHistory] = useState([]);
@@ -13,7 +14,6 @@ export default function ArchivePage({ token, refreshMessages, removeMessage }) {
   const [error, setError] = useState(null);
   const [stats, setStats] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilter, setActiveFilter] = useState('all');
   const [expandedMessage, setExpandedMessage] = useState(null);
 
   const fetchChatHistory = useCallback(async () => {
@@ -25,7 +25,7 @@ export default function ArchivePage({ token, refreshMessages, removeMessage }) {
         throw new Error(result.error);
       }
 
-      setChatHistory(result.data.messages || []);
+      setChatHistory(sortMessagesNewestFirst(result.data.messages || []));
       setError(null);
     } catch (err) {
       setError('Failed to load chat history');
@@ -77,23 +77,19 @@ export default function ArchivePage({ token, refreshMessages, removeMessage }) {
     }
   };
 
-  // Filter messages
-  const filteredMessages = chatHistory.filter(msg => {
-    const matchesSearch = msg.text.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = activeFilter === 'all' || msg.role === activeFilter;
-    return matchesSearch && matchesFilter;
+  const conversationTurns = buildConversationTurns(sortMessagesNewestFirst(chatHistory));
+
+  // Filter conversations while keeping each question/answer pair intact
+  const filteredConversationTurns = conversationTurns.filter((turn) => {
+    const searchableText = `${turn.user?.text || ''} ${turn.assistant?.text || ''}`.toLowerCase();
+    return searchableText.includes(searchTerm.toLowerCase());
   });
 
-  // Group messages by date
-  const groupedByDate = filteredMessages.reduce((acc, msg) => {
-    const date = new Date(msg.created_at).toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+  // Group conversations by date
+  const groupedByDate = filteredConversationTurns.reduce((acc, turn) => {
+    const date = formatMessageDate(turn.created_at);
     if (!acc[date]) acc[date] = [];
-    acc[date].push(msg);
+    acc[date].push(turn);
     return acc;
   }, {});
 
@@ -122,19 +118,17 @@ export default function ArchivePage({ token, refreshMessages, removeMessage }) {
       <ArchiveControls 
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
-        activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
       />
       <div style={messagesContainerStyle}>
         {error && <ArchiveEmptyState error={error} searchTerm={searchTerm} />}
-        {filteredMessages.length === 0 && !error && (
+        {filteredConversationTurns.length === 0 && !error && (
           <ArchiveEmptyState error={null} searchTerm={searchTerm} />
         )}
-        {Object.entries(groupedByDate).map(([date, messages]) => (
+        {Object.entries(groupedByDate).map(([date, conversations]) => (
           <MessageGroup 
             key={date} 
             date={date} 
-            messages={messages}
+            conversations={conversations}
             onExpandMessage={setExpandedMessage}
           />
         ))}

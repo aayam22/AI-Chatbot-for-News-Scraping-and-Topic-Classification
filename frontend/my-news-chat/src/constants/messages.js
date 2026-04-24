@@ -1,8 +1,8 @@
 // UI Messages
 export const UI_MESSAGES = {
-  WELCOME: '📰 Ask about latest news...',
+  WELCOME: 'Ask about the latest news, request a regional summary, or drill into a developing story.',
   GENERATING_ANSWER: 'Generating answer',
-  ERROR_PREFIX: '❌ Error: ',
+  ERROR_PREFIX: 'Error: ',
   SOURCES_COUNT: (count) => `${count} sources`,
   DEFAULT_SOURCE_CATEGORY: 'SOURCE',
   DEFAULT_SOURCE_TITLE: 'Untitled'

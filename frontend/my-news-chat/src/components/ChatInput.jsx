@@ -25,32 +25,45 @@ export default function ChatInput({ onSend, onClear, disabled }) {
 
   return (
     <div style={STYLES.INPUT_CONTAINER}>
-      <input
-        id="chat-input"
-        type="text"
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={PLACEHOLDERS.CHAT_INPUT}
-        disabled={disabled}
-        style={STYLES.INPUT_FIELD}
-      />
+      <div style={STYLES.INPUT_FIELD_WRAP}>
+        <div style={STYLES.INPUT_LABEL_ROW}>
+          <label htmlFor="chat-input" style={STYLES.INPUT_LABEL}>
+            Query Console
+          </label>
+          <span style={STYLES.INPUT_HINT}>Press Enter to send</span>
+        </div>
 
-      <button
-        onClick={handleSubmit}
-        disabled={disabled}
-        style={STYLES.BUTTON}
-      >
-        {BUTTON_LABELS.SEND}
-      </button>
+        <textarea
+          id="chat-input"
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={PLACEHOLDERS.CHAT_INPUT}
+          disabled={disabled}
+          style={STYLES.INPUT_FIELD}
+          rows={1}
+        />
+      </div>
 
-      <button
-        onClick={onClear}
-        disabled={disabled}
-        style={STYLES.BUTTON}
-      >
-        {BUTTON_LABELS.CLEAR}
-      </button>
+      <div style={STYLES.BUTTON_GROUP}>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={disabled || !question.trim()}
+          style={STYLES.BUTTON('primary')}
+        >
+          {BUTTON_LABELS.SEND}
+        </button>
+
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={disabled}
+          style={STYLES.BUTTON('secondary')}
+        >
+          {BUTTON_LABELS.CLEAR}
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { formatMessageDateTime } from '../utils/dateTime';
+
 const ExpandedMessageModal = ({ message, onClose, onDelete }) => {
   const messageTimeStyle = {
     fontSize: '11px',
@@ -72,18 +74,11 @@ const ExpandedMessageModal = ({ message, onClose, onDelete }) => {
     <div style={expandedMessageStyle} onClick={onClose}>
       <div style={expandedContentStyle} onClick={(e) => e.stopPropagation()}>
         <button style={closeButtonStyle} onClick={onClose}>
-          ✕
+          X
         </button>
         <div style={{ marginTop: '16px' }}>
           <div style={messageTimeStyle}>
-            {new Date(message.created_at).toLocaleString('en-US', {
-              weekday: 'short',
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })} • {message.role === 'user' ? 'YOUR QUESTION' : 'RESPONSE'}
+            {formatMessageDateTime(message.created_at)} - {message.role === 'user' ? 'YOUR QUESTION' : 'RESPONSE'}
           </div>
           <div style={{ ...messageTextStyle, marginTop: '16px' }}>
             {message.text}

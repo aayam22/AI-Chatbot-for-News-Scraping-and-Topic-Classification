@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { STORAGE_KEYS } from '../constants/config';
 import { getChatHistory } from '../services/chatHistoryService';
+import { formatMessageTime } from '../utils/dateTime';
 
 function getInitialMessages() {
   const savedMessages = localStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES);
@@ -24,12 +25,7 @@ function normalizeServerMessages(messages) {
     text: message.text,
     sources: Array.isArray(message.sources) ? message.sources : [],
     created_at: message.created_at,
-    time: message.created_at
-      ? new Date(message.created_at).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : ''
+    time: formatMessageTime(message.created_at)
   }));
 }
 

@@ -20,16 +20,20 @@ export default function NewsChat({ messages, setMessages, token, refreshMessages
 
   return (
     <div style={STYLES.CHAT_CONTAINER}>
-      <MessageList
-        messages={messages}
-        onImageClick={(imageUrl) => setPreviewImage(imageUrl)}
-      />
+      <div style={STYLES.CHAT_PANEL}>
+        <MessageList
+          messages={messages}
+          onImageClick={(imageUrl) => setPreviewImage(imageUrl)}
+        />
+      </div>
 
-      <ChatInput
-        onSend={sendQuestion}
-        onClear={handleClearChat}
-        disabled={!token}
-      />
+      <div style={STYLES.INPUT_DOCK}>
+        <ChatInput
+          onSend={sendQuestion}
+          onClear={handleClearChat}
+          disabled={!token}
+        />
+      </div>
 
       <ImagePreview
         imageUrl={previewImage}

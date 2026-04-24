@@ -4,7 +4,75 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
 body {
-  background: #f8fafc;
+  background: #ececec;
   color: #111827;
+  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+textarea:focus,
+input:focus,
+button:focus {
+  outline: none;
+}
+
+textarea:focus,
+input:focus {
+  border-color: #111 !important;
+  box-shadow: 0 0 0 4px rgba(17, 17, 17, 0.08);
+}
+
+button:disabled,
+input:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(17, 17, 17, 0.22);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (max-width: 900px) {
+  .chat-header {
+    padding: 18px !important;
+  }
+}
+
+@media (max-width: 720px) {
+  body {
+    font-size: 15px;
+  }
+
+  .chat-header {
+    box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.08) !important;
+  }
 }

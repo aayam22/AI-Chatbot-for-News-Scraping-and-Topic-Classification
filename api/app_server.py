@@ -368,7 +368,7 @@ def get_article_statistics(date_from: str = None, date_to: str = None, category:
 # PER-USER CHAT HISTORY
 # ----------------------------
 # Map username → list of messages
-def get_recent_conversation_history(db: Session, username: str, max_turns: int = 3):
+def get_recent_conversation_history(db: Session, username: str, max_turns: int = 15):
     """
     Build recent user/assistant turns for prompt context from persisted chat history.
     """

@@ -1,3 +1,5 @@
+import { formatMessageTime } from '../utils/dateTime';
+
 const MessageItem = ({ msg, onExpand }) => {
   const messageItemStyle = (isUser) => ({
     marginBottom: '16px',
@@ -35,17 +37,14 @@ const MessageItem = ({ msg, onExpand }) => {
       onClick={() => onExpand(msg)}
     >
       <div style={messageTimeStyle}>
-        {new Date(msg.created_at).toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })} • {msg.role === 'user' ? 'YOU' : 'ASSISTANT'}
+        {formatMessageTime(msg.created_at)} - {msg.role === 'user' ? 'YOU' : 'ASSISTANT'}
       </div>
       <div style={messageTextStyle}>
         {msg.text.length > 150 ? `${msg.text.substring(0, 150)}...` : msg.text}
       </div>
       {msg.sources && msg.sources.length > 0 && (
         <div style={{ marginTop: '8px', fontSize: '11px', opacity: 0.7 }}>
-          📎 {msg.sources.length} source{msg.sources.length > 1 ? 's' : ''}
+          {msg.sources.length} source{msg.sources.length > 1 ? 's' : ''}
         </div>
       )}
     </div>

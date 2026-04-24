@@ -1,6 +1,6 @@
-import MessageItem from './MessageItem';
+import ConversationItem from './ConversationItem';
 
-const MessageGroup = ({ date, messages, onExpandMessage }) => {
+const MessageGroup = ({ date, conversations, onExpandMessage }) => {
   const dateGroupStyle = {
     marginBottom: '32px',
   };
@@ -19,8 +19,12 @@ const MessageGroup = ({ date, messages, onExpandMessage }) => {
   return (
     <div style={dateGroupStyle}>
       <div style={dateHeaderStyle}>{date}</div>
-      {messages.map((msg) => (
-        <MessageItem key={msg.id} msg={msg} onExpand={onExpandMessage} />
+      {conversations.map((conversation) => (
+        <ConversationItem
+          key={conversation.id}
+          turn={conversation}
+          onExpand={onExpandMessage}
+        />
       ))}
     </div>
   );
