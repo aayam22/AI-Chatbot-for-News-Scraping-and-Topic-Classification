@@ -18,6 +18,7 @@ function App() {
   const {
     messages,
     setMessages,
+    clearVisibleMessages,
     clearAllMessages,
     refreshMessages,
     removeMessage,
@@ -63,6 +64,7 @@ function App() {
                   <ChatPage
                     messages={messages}
                     setMessages={setMessages}
+                    clearVisibleMessages={clearVisibleMessages}
                     token={token}
                     refreshMessages={refreshMessages}
                   />

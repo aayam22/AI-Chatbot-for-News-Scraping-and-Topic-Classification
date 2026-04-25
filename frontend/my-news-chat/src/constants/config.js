@@ -20,5 +20,6 @@ export const UI_CONFIG = {
 // Token storage key
 export const STORAGE_KEYS = {
   TOKEN: 'token',
-  CHAT_MESSAGES: 'chat_messages'
+  CHAT_MESSAGES: 'chat_messages',
+  CHAT_PAGE_CLEARED_AT: 'chat_page_cleared_at'
 };

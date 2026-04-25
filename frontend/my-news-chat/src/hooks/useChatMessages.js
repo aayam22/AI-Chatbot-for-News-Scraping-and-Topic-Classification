@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { STORAGE_KEYS } from '../constants/config';
 import { getChatHistory } from '../services/chatHistoryService';
-import { formatMessageTime } from '../utils/dateTime';
+import { formatMessageTime, normalizeServerTimestamp } from '../utils/dateTime';
 
 function getInitialMessages() {
   const savedMessages = localStorage.getItem(STORAGE_KEYS.CHAT_MESSAGES);
@@ -18,6 +18,10 @@ function getInitialMessages() {
   }
 }
 
+function getInitialClearedAt() {
+  return localStorage.getItem(STORAGE_KEYS.CHAT_PAGE_CLEARED_AT);
+}
+
 function normalizeServerMessages(messages) {
   return messages.map((message) => ({
     id: message.id,
@@ -29,11 +33,31 @@ function normalizeServerMessages(messages) {
   }));
 }
 
+function isMessageVisible(message, clearedAt) {
+  if (!clearedAt || !message.created_at) {
+    return true;
+  }
+
+  const clearedAtTime = normalizeServerTimestamp(clearedAt)?.getTime();
+  const messageTime = normalizeServerTimestamp(message.created_at)?.getTime();
+
+  if (clearedAtTime == null || messageTime == null) {
+    return true;
+  }
+
+  return messageTime >= clearedAtTime;
+}
+
+function filterVisibleMessages(messages, clearedAt) {
+  return messages.filter((message) => isMessageVisible(message, clearedAt));
+}
+
 /**
  * Custom hook for managing chat messages with localStorage persistence
  */
 export const useChatMessages = (token) => {
   const [messages, setMessages] = useState(getInitialMessages);
+  const [chatPageClearedAt, setChatPageClearedAt] = useState(getInitialClearedAt);
 
   const refreshMessages = useCallback(async () => {
     if (!token) {
@@ -45,13 +69,14 @@ export const useChatMessages = (token) => {
 
     if (result.success) {
       const normalizedMessages = normalizeServerMessages(result.data.messages || []);
-      setMessages(normalizedMessages);
-      return { success: true, data: normalizedMessages };
+      const visibleMessages = filterVisibleMessages(normalizedMessages, chatPageClearedAt);
+      setMessages(visibleMessages);
+      return { success: true, data: visibleMessages };
     }
 
     console.error('Error loading chat history from server:', result.error);
     return { success: false, error: result.error };
-  }, [token]);
+  }, [token, chatPageClearedAt]);
 
   useEffect(() => {
     let isActive = true;
@@ -70,7 +95,8 @@ export const useChatMessages = (token) => {
       }
 
       if (result.success) {
-        setMessages(normalizeServerMessages(result.data.messages || []));
+        const normalizedMessages = normalizeServerMessages(result.data.messages || []);
+        setMessages(filterVisibleMessages(normalizedMessages, chatPageClearedAt));
       } else {
         console.error('Error loading chat history from server:', result.error);
       }
@@ -81,24 +107,46 @@ export const useChatMessages = (token) => {
     return () => {
       isActive = false;
     };
-  }, [token]);
+  }, [token, chatPageClearedAt]);
 
   // Save messages to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CHAT_MESSAGES, JSON.stringify(messages));
   }, [messages]);
 
+  useEffect(() => {
+    if (chatPageClearedAt) {
+      localStorage.setItem(STORAGE_KEYS.CHAT_PAGE_CLEARED_AT, chatPageClearedAt);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.CHAT_PAGE_CLEARED_AT);
+    }
+  }, [chatPageClearedAt]);
+
+  const clearVisibleMessages = useCallback(() => {
+    setChatPageClearedAt(new Date().toISOString());
+    setMessages([]);
+  }, []);
+
   // Clear messages and localStorage
   const clearAllMessages = useCallback(() => {
     setMessages([]);
+    setChatPageClearedAt(null);
     localStorage.removeItem(STORAGE_KEYS.CHAT_MESSAGES);
+    localStorage.removeItem(STORAGE_KEYS.CHAT_PAGE_CLEARED_AT);
   }, []);
 
   const removeMessage = useCallback((messageId) => {
     setMessages((prev) => prev.filter((message) => message.id !== messageId));
   }, []);
 
-  return { messages, setMessages, clearAllMessages, refreshMessages, removeMessage };
+  return {
+    messages,
+    setMessages,
+    clearVisibleMessages,
+    clearAllMessages,
+    refreshMessages,
+    removeMessage
+  };
 };
 
 export default useChatMessages;

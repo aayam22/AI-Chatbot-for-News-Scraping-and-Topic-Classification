@@ -10,9 +10,20 @@ import { STYLES } from '../constants/styles';
  * Orchestrates message display, input, and images
  * Uses custom hooks for clean, modular logic
  */
-export default function NewsChat({ messages, setMessages, token, refreshMessages }) {
+export default function NewsChat({
+  messages,
+  setMessages,
+  clearVisibleMessages,
+  token,
+  refreshMessages
+}) {
   const [previewImage, setPreviewImage] = useState(null);
-  const { sendQuestion, clearChat } = useChat(setMessages, token, refreshMessages);
+  const { sendQuestion, clearChat } = useChat(
+    setMessages,
+    clearVisibleMessages,
+    token,
+    refreshMessages
+  );
 
   const handleClearChat = async () => {
     await clearChat();

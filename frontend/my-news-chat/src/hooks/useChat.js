@@ -6,7 +6,7 @@ import { UI_MESSAGES } from '../constants/messages';
  * Custom hook for chat operations (send question, clear chat)
  * Handles API calls and message state updates
  */
-export const useChat = (setMessages, token, refreshMessages) => {
+export const useChat = (setMessages, clearVisibleMessages, token, refreshMessages) => {
   /**
    * Generate unique message ID
    */
@@ -79,8 +79,8 @@ export const useChat = (setMessages, token, refreshMessages) => {
    * This should not remove archived server history.
    */
   const clearChat = useCallback(async () => {
-    setMessages([]);
-  }, [setMessages]);
+    clearVisibleMessages();
+  }, [clearVisibleMessages]);
 
   return { sendQuestion, clearChat, generateMessageId };
 };
