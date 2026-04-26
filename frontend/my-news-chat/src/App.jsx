@@ -5,6 +5,7 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import AnalysisPage from "./pages/AnalysisPage";
 import ArchivePage from "./pages/ArchivePage";
+import SettingsPage from "./pages/SettingsPage";
 import { useCallback, useState } from "react";
 import useAuth from "./hooks/useAuth";
 import useChatMessages from "./hooks/useChatMessages";
@@ -92,10 +93,18 @@ function App() {
               }
             />
             <Route
+              path="/settings"
+              element={
+                <ProtectedRoute isAuthenticated={isAuthenticated}>
+                  <SettingsPage token={token} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/system"
               element={
                 <ProtectedRoute isAuthenticated={isAuthenticated}>
-                  <h1>System Page</h1>
+                  <Navigate to="/settings" replace />
                 </ProtectedRoute>
               }
             />

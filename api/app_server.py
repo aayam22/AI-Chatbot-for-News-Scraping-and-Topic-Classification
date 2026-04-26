@@ -18,6 +18,9 @@ from collections import Counter
 import os
 import secrets
 import smtplib
+import subprocess
+import sys
+import threading
 
 try:
     from .password_policy import validate_password_strength
@@ -62,6 +65,9 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", SMTP_USERNAME or "no-reply@intel-core.local")
 SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes", "on"}
 SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "false").lower() in {"1", "true", "yes", "on"}
+PIPELINE_DEFAULT_MODE = "full"
+PIPELINE_ALLOWED_MODES = {"full", "fast"}
+PIPELINE_MAX_OUTPUT_CHARS = 50000
 
 # ----------------------------
 # DATABASE SETUP
@@ -230,6 +236,24 @@ class ChatMessageResponse(BaseModel):
 class ChatHistoryRequest(BaseModel):
     limit: int = 100
     offset: int = 0
+
+
+class PipelineRunRequest(BaseModel):
+    mode: str = PIPELINE_DEFAULT_MODE
+
+
+pipeline_run_lock = threading.Lock()
+pipeline_status_lock = threading.Lock()
+pipeline_run_state = {
+    "status": "idle",
+    "mode": PIPELINE_DEFAULT_MODE,
+    "started_at": None,
+    "finished_at": None,
+    "updated_at": None,
+    "last_triggered_by": None,
+    "exit_code": None,
+    "output": "",
+}
 
 # ----------------------------
 # DEPENDENCY
@@ -402,6 +426,114 @@ def build_fake_chat_response(question: str, conversation_history: list[dict]):
         "answer": f"E2E answer ({history_turns} prior turns): {question}",
         "sources": [],
     }
+
+
+def utc_now_isoformat():
+    return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+
+def update_pipeline_run_state(**updates):
+    with pipeline_status_lock:
+        pipeline_run_state.update(updates)
+
+
+def append_pipeline_output(text: str):
+    if not text:
+        return
+
+    with pipeline_status_lock:
+        combined_output = f"{pipeline_run_state.get('output', '')}{text}"
+        if len(combined_output) > PIPELINE_MAX_OUTPUT_CHARS:
+            combined_output = combined_output[-PIPELINE_MAX_OUTPUT_CHARS:]
+
+        pipeline_run_state["output"] = combined_output
+        pipeline_run_state["updated_at"] = utc_now_isoformat()
+
+
+def build_pipeline_status_response():
+    with pipeline_status_lock:
+        snapshot = dict(pipeline_run_state)
+
+    snapshot["can_start"] = snapshot["status"] != "running"
+    return snapshot
+
+
+def execute_pipeline_run(started_by: str, mode: str):
+    process = None
+    try:
+        command = [sys.executable, "-u", "pipeline.py", "--mode", mode]
+        environment = os.environ.copy()
+        environment["PYTHONIOENCODING"] = "utf-8"
+        environment["PYTHONUNBUFFERED"] = "1"
+
+        process = subprocess.Popen(
+            command,
+            cwd=PROJECT_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            encoding="utf-8",
+            errors="replace",
+            env=environment,
+            text=True,
+            bufsize=1,
+        )
+
+        if process.stdout:
+            for line in process.stdout:
+                append_pipeline_output(line)
+            process.stdout.close()
+
+        exit_code = process.wait()
+
+        update_pipeline_run_state(
+            status="succeeded" if exit_code == 0 else "failed",
+            finished_at=utc_now_isoformat(),
+            updated_at=utc_now_isoformat(),
+            last_triggered_by=started_by,
+            exit_code=exit_code,
+        )
+    except Exception as exc:
+        update_pipeline_run_state(
+            status="failed",
+            finished_at=utc_now_isoformat(),
+            updated_at=utc_now_isoformat(),
+            last_triggered_by=started_by,
+            exit_code=-1,
+        )
+        append_pipeline_output(f"\nPipeline execution failed before completion: {exc}\n")
+    finally:
+        if process and process.stdout and not process.stdout.closed:
+            process.stdout.close()
+        pipeline_run_lock.release()
+
+
+def start_pipeline_run(started_by: str, mode: str):
+    if not pipeline_run_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="A pipeline run is already in progress.")
+
+    try:
+        update_pipeline_run_state(
+            status="running",
+            mode=mode,
+            started_at=utc_now_isoformat(),
+            finished_at=None,
+            updated_at=utc_now_isoformat(),
+            last_triggered_by=started_by,
+            exit_code=None,
+            output=f"Pipeline started in {mode} mode.\nWaiting for live output...\n",
+        )
+
+        worker = threading.Thread(
+            target=execute_pipeline_run,
+            args=(started_by, mode),
+            daemon=True,
+        )
+        worker.start()
+    except Exception:
+        pipeline_run_lock.release()
+        raise
+
+    return build_pipeline_status_response()
 
 # ----------------------------
 # LIFESPAN HANDLER (RAG Init)
@@ -792,6 +924,21 @@ def get_news_by_date_range_endpoint(req: DateRangeRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/system/pipeline-status")
+def get_pipeline_status(current_user: str = Depends(get_current_user)):
+    return build_pipeline_status_response()
+
+
+@app.post("/system/pipeline/run")
+def run_pipeline_endpoint(req: PipelineRunRequest, current_user: str = Depends(get_current_user)):
+    mode = req.mode.strip().lower()
+    if mode not in PIPELINE_ALLOWED_MODES:
+        allowed_modes = ", ".join(sorted(PIPELINE_ALLOWED_MODES))
+        raise HTTPException(status_code=400, detail=f"Invalid mode. Use one of: {allowed_modes}.")
+
+    return start_pipeline_run(current_user, mode)
 
 # ----------------------------
 # HEALTH CHECK

@@ -3,7 +3,9 @@ export const API_CONFIG = {
   BACKEND_URL: 'http://127.0.0.1:8000',
   ENDPOINTS: {
     ASK: '/ask',
-    CLEAR_MEMORY: '/clear-memory'
+    CLEAR_MEMORY: '/clear-memory',
+    PIPELINE_STATUS: '/system/pipeline-status',
+    PIPELINE_RUN: '/system/pipeline/run'
   },
   TIMEOUT: 30000
 };
