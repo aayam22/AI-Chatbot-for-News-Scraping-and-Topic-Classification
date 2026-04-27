@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { API_CONFIG } from "../constants/config";
-import styles from "./RegisterPage.module.css";
 
 const initialFormState = {
   username: "",
@@ -197,38 +196,39 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.card}>
-        <h1 className={styles.header}>INTEL_CORE</h1>
-        <p className={styles.subtitle}>
+    <div className="app-shell flex min-h-screen items-center justify-center px-4 py-8">
+      <div className="intel-card w-full max-w-xl p-6 sm:p-8">
+        <p className="intel-kicker mb-3">Secure onboarding</p>
+        <h1 className="text-[2.2rem] font-black tracking-[-0.08em] text-zinc-950">INTEL_CORE</h1>
+        <p className="mt-2 text-sm font-medium text-zinc-600">
           {step === "details" ? "Create Account" : "Verify Signup"}
         </p>
 
         {error && (
-          <div className={styles.error} role="alert">
+          <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700" role="alert">
             {error}
           </div>
         )}
         {success && (
-          <div className={styles.success} aria-live="polite">
+          <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700" aria-live="polite">
             {success}
           </div>
         )}
 
         {step === "otp" && (
-          <div className={styles.infoBox}>
+          <div className="mt-5 rounded-2xl border border-black/10 bg-white/70 px-4 py-3 text-sm leading-6 text-zinc-700">
             Verifying <strong>{formData.email}</strong>. Enter the OTP to finish
             creating your account.
           </div>
         )}
 
         {debugOtp && step === "otp" && (
-          <div className={styles.debugBox}>
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">
             Debug OTP: <strong>{debugOtp}</strong>
           </div>
         )}
 
-        <form className={styles.form} onSubmit={handleSubmit}>
+        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           {step === "details" ? (
             <>
               <input
@@ -236,7 +236,7 @@ export default function RegisterPage() {
                 value={formData.username}
                 onChange={handleChange("username")}
                 disabled={isLoading}
-                className={styles.input}
+                className="intel-input"
                 autoComplete="username"
                 required
               />
@@ -246,7 +246,7 @@ export default function RegisterPage() {
                 value={formData.email}
                 onChange={handleChange("email")}
                 disabled={isLoading}
-                className={styles.input}
+                className="intel-input"
                 autoComplete="email"
                 required
               />
@@ -256,19 +256,21 @@ export default function RegisterPage() {
                 value={formData.password}
                 onChange={handleChange("password")}
                 disabled={isLoading}
-                className={styles.input}
+                className="intel-input"
                 autoComplete="new-password"
                 required
               />
-              <div className={styles.passwordPanel}>
-                <div className={styles.passwordHeading}>Password requirements</div>
-                <ul className={styles.passwordList}>
+              <div className="rounded-[1.25rem] border border-black/10 bg-white/75 p-4">
+                <div className="intel-kicker mb-3">Password requirements</div>
+                <ul className="space-y-2 text-sm leading-6 text-zinc-600">
                   {PASSWORD_REQUIREMENTS.map((requirement) => (
                     <li key={requirement}>{requirement}</li>
                   ))}
                 </ul>
                 {formData.password && passwordError && (
-                  <div className={styles.passwordError}>{passwordError}</div>
+                  <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                    {passwordError}
+                  </div>
                 )}
               </div>
             </>
@@ -278,7 +280,7 @@ export default function RegisterPage() {
               value={otp}
               onChange={(event) => setOtp(event.target.value)}
               disabled={isLoading}
-              className={styles.input}
+              className="intel-input"
               inputMode="numeric"
               autoComplete="one-time-code"
               required
@@ -288,7 +290,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={isLoading || (step === "details" && !!passwordError)}
-            className={styles.button}
+            className="intel-button w-full"
           >
             {isLoading
               ? step === "details"
@@ -301,12 +303,12 @@ export default function RegisterPage() {
         </form>
 
         {step === "otp" && (
-          <div className={styles.actionRow}>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
               onClick={handleResendOtp}
               disabled={isLoading}
-              className={`${styles.button} ${styles.secondaryButton}`}
+              className="intel-button-secondary flex-1"
             >
               RESEND OTP
             </button>
@@ -314,16 +316,19 @@ export default function RegisterPage() {
               type="button"
               onClick={handleEditDetails}
               disabled={isLoading}
-              className={`${styles.button} ${styles.secondaryButton}`}
+              className="intel-button-secondary flex-1"
             >
               EDIT DETAILS
             </button>
           </div>
         )}
 
-        <div className={styles.footer}>
+        <div className="mt-6 text-sm font-medium text-zinc-600">
           Already have an account?{" "}
-          <Link to="/login" className={styles.link}>
+          <Link
+            to="/login"
+            className="font-bold text-zinc-950 underline decoration-black/30 underline-offset-4 transition hover:decoration-black"
+          >
             Sign In
           </Link>
         </div>

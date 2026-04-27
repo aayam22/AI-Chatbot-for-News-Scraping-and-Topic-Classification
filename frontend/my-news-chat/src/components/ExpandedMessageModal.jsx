@@ -1,101 +1,35 @@
-import { formatMessageDateTime } from '../utils/dateTime';
+import { formatMessageDateTime } from "../utils/dateTime";
 
 const ExpandedMessageModal = ({ message, onClose, onDelete }) => {
-  const messageTimeStyle = {
-    fontSize: '11px',
-    opacity: 0.6,
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    fontWeight: 'bold',
-  };
-
-  const messageTextStyle = {
-    fontSize: '14px',
-    lineHeight: '1.8',
-  };
-
-  const expandedMessageStyle = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-  };
-
-  const expandedContentStyle = {
-    backgroundColor: '#fff',
-    border: '4px solid #000',
-    padding: '24px',
-    borderRadius: '4px',
-    maxWidth: '700px',
-    maxHeight: '80vh',
-    overflowY: 'auto',
-    boxShadow: '8px 8px 0px #000',
-    position: 'relative',
-  };
-
-  const closeButtonStyle = {
-    position: 'absolute',
-    top: '12px',
-    right: '12px',
-    width: '32px',
-    height: '32px',
-    border: '2px solid #000',
-    backgroundColor: '#fff',
-    fontWeight: 'bold',
-    fontSize: '18px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  };
-
-  const deleteButtonStyle = {
-    marginTop: '16px',
-    padding: '12px',
-    backgroundColor: '#ff6b6b',
-    color: '#fff',
-    border: 'none',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    width: '100%',
-    borderRadius: '4px',
-    fontSize: '12px',
-  };
-
   if (!message) return null;
 
   return (
-    <div style={expandedMessageStyle} onClick={onClose}>
-      <div style={expandedContentStyle} onClick={(e) => e.stopPropagation()}>
-        <button style={closeButtonStyle} onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div
+        className="relative max-h-[80vh] w-full max-w-2xl overflow-y-auto border-4 border-black bg-white p-6 shadow-[10px_10px_0_#000]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center border-2 border-black bg-white text-base font-black transition hover:-translate-y-0.5"
+          onClick={onClose}
+        >
           X
         </button>
-        <div style={{ marginTop: '16px' }}>
-          <div style={messageTimeStyle}>
-            {formatMessageDateTime(message.created_at)} - {message.role === 'user' ? 'YOUR QUESTION' : 'RESPONSE'}
+        <div className="mt-6">
+          <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+            {formatMessageDateTime(message.created_at)} - {message.role === "user" ? "YOUR QUESTION" : "RESPONSE"}
           </div>
-          <div style={{ ...messageTextStyle, marginTop: '16px' }}>
+          <div className="mt-4 whitespace-pre-wrap text-sm leading-8 text-zinc-800">
             {message.text}
           </div>
           {message.sources && message.sources.length > 0 && (
-            <div style={{ marginTop: '16px' }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>SOURCES:</div>
+            <div className="mt-5">
+              <div className="intel-kicker mb-3">Sources</div>
               {message.sources.map((source, idx) => (
                 <div
                   key={idx}
-                  style={{
-                    padding: '8px',
-                    backgroundColor: '#eee',
-                    marginBottom: '8px',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                  }}
+                  className="mb-2 rounded-2xl bg-zinc-100 px-4 py-3 text-sm font-medium text-zinc-700"
                 >
                   {source.title || source.category}
                 </div>
@@ -103,7 +37,8 @@ const ExpandedMessageModal = ({ message, onClose, onDelete }) => {
             </div>
           )}
           <button
-            style={deleteButtonStyle}
+            type="button"
+            className="mt-5 w-full rounded-2xl border border-red-300 bg-red-500 px-4 py-3 text-xs font-extrabold uppercase tracking-[0.14em] text-white transition hover:-translate-y-0.5 hover:bg-red-600"
             onClick={() => onDelete(message.id)}
           >
             DELETE MESSAGE

@@ -1,8 +1,5 @@
-import PropTypes from 'prop-types';
+import PropTypes from "prop-types";
 
-/**
- * FilterPanel - Display filter controls for analysis data
- */
 function FilterPanel({
   dateFrom,
   onDateFromChange,
@@ -15,69 +12,34 @@ function FilterPanel({
   onSourceChange,
   availableSources,
 }) {
-  const filterContainerStyle = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-    gap: '12px',
-    padding: '16px',
-    backgroundColor: '#fff',
-    border: '2px solid #000',
-    borderRadius: '0px',
-  };
-
-  const filterGroupStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-  };
-
-  const filterLabelStyle = {
-    fontSize: '10px',
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    marginBottom: '6px',
-    color: '#000',
-  };
-
-  const filterInputStyle = {
-    padding: '8px 12px',
-    border: '2px solid #000',
-    backgroundColor: '#fff',
-    fontFamily: '"Space Grotesk", sans-serif',
-    fontSize: '12px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-  };
-
   return (
-    <div style={filterContainerStyle}>
-      <div style={filterGroupStyle}>
-        <div style={filterLabelStyle}>From Date</div>
+    <div className="intel-card grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+      <div>
+        <div className="intel-kicker mb-2">From Date</div>
         <input
           type="date"
-          value={dateFrom || ''}
+          value={dateFrom || ""}
           onChange={(e) => onDateFromChange(e.target.value || null)}
-          style={filterInputStyle}
+          className="intel-select"
         />
       </div>
 
-      <div style={filterGroupStyle}>
-        <div style={filterLabelStyle}>To Date</div>
+      <div>
+        <div className="intel-kicker mb-2">To Date</div>
         <input
           type="date"
-          value={dateTo || ''}
+          value={dateTo || ""}
           onChange={(e) => onDateToChange(e.target.value || null)}
-          style={filterInputStyle}
+          className="intel-select"
         />
       </div>
 
-      <div style={filterGroupStyle}>
-        <div style={filterLabelStyle}>Topic</div>
+      <div>
+        <div className="intel-kicker mb-2">Topic</div>
         <select
-          value={selectedCategory || ''}
+          value={selectedCategory || ""}
           onChange={(e) => onCategoryChange(e.target.value || null)}
-          style={filterInputStyle}
+          className="intel-select"
         >
           <option value="">All</option>
           {availableCategories?.map((cat) => (
@@ -88,12 +50,12 @@ function FilterPanel({
         </select>
       </div>
 
-      <div style={filterGroupStyle}>
-        <div style={filterLabelStyle}>Source</div>
+      <div>
+        <div className="intel-kicker mb-2">Source</div>
         <select
-          value={selectedSource || ''}
+          value={selectedSource || ""}
           onChange={(e) => onSourceChange(e.target.value || null)}
-          style={filterInputStyle}
+          className="intel-select"
         >
           <option value="">All</option>
           {availableSources?.map((src) => (

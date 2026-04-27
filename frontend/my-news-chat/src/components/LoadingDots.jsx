@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
-export default function LoadingDots({ text = 'Generating' }) {
-  const [dots, setDots] = useState('.');
+export default function LoadingDots({ text = "Generating" }) {
+  const [dots, setDots] = useState(".");
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setDots(prev => {
-        if (prev === '.') return '..';
-        if (prev === '..') return '...';
-        if (prev === '...') return '....';
-        return '.';
+      setDots((prev) => {
+        if (prev === ".") return "..";
+        if (prev === "..") return "...";
+        if (prev === "...") return "....";
+        return ".";
       });
     }, 500);
 
@@ -17,8 +17,12 @@ export default function LoadingDots({ text = 'Generating' }) {
   }, []);
 
   return (
-    <span style={{ display: 'inline-block' }}>
-      ⏳ {text}{dots}
+    <span className="inline-flex items-center gap-2 text-sm font-semibold text-current">
+      <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-current" />
+      <span>
+        {text}
+        {dots}
+      </span>
     </span>
   );
 }

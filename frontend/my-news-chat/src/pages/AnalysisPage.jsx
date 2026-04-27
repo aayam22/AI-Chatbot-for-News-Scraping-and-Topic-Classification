@@ -9,13 +9,13 @@ import {
   Title,
   Tooltip,
   Legend,
-} from 'chart.js';
-import { useMemo } from 'react';
-import { useAnalysisFilters } from '../hooks/useAnalysisFilters';
-import { useFetchAnalysis } from '../hooks/useFetchAnalysis';
-import FilterPanel from '../components/FilterPanel';
-import MetricsSection from '../components/MetricsSection';
-import ChartsSection from '../components/ChartsSection';
+} from "chart.js";
+import { useMemo } from "react";
+import { useAnalysisFilters } from "../hooks/useAnalysisFilters";
+import { useFetchAnalysis } from "../hooks/useFetchAnalysis";
+import FilterPanel from "../components/FilterPanel";
+import MetricsSection from "../components/MetricsSection";
+import ChartsSection from "../components/ChartsSection";
 
 ChartJS.register(
   CategoryScale,
@@ -29,12 +29,7 @@ ChartJS.register(
   Legend
 );
 
-/**
- * AnalysisPage - Analytics Dashboard matching INTEL_CORE chat theme
- * Refactored to use custom hooks and extracted components
- */
 export default function AnalysisPage() {
-  // Use custom hook for filter state management
   const {
     selectedCategory,
     setSelectedCategory,
@@ -47,149 +42,105 @@ export default function AnalysisPage() {
     getFilterParams,
   } = useAnalysisFilters();
 
-  // Build filter params (triggers refetch when filters change)
   const filterParams = useMemo(() => getFilterParams(), [getFilterParams]);
-
-  // Use custom hook for data fetching
   const { analysisData, loading, error } = useFetchAnalysis(filterParams);
 
-
-  // Memoize chart options to prevent unnecessary recalculations
-  const chartOptions = useMemo(() => ({
-    responsive: true,
-    maintainAspectRatio: true,
-    plugins: {
-      legend: {
-        display: true,
-        labels: {
-          font: { family: '"Space Grotesk", sans-serif', weight: '600', size: 11 },
-          padding: 12,
-          usePointStyle: true,
-          color: '#000',
+  const chartOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: {
+          display: true,
+          labels: {
+            font: { family: '"Space Grotesk", sans-serif', weight: "600", size: 11 },
+            padding: 12,
+            usePointStyle: true,
+            color: "#000",
+          },
         },
       },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        ticks: { font: { family: '"Space Grotesk", sans-serif', weight: '600', size: 11 }, color: '#000' },
-        grid: { color: 'rgba(0, 0, 0, 0.1)' },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            font: { family: '"Space Grotesk", sans-serif', weight: "600", size: 11 },
+            color: "#000",
+          },
+          grid: { color: "rgba(0, 0, 0, 0.1)" },
+        },
+        x: {
+          ticks: {
+            font: { family: '"Space Grotesk", sans-serif', weight: "600", size: 11 },
+            color: "#000",
+          },
+          grid: { color: "rgba(0, 0, 0, 0.1)" },
+        },
       },
-      x: {
-        ticks: { font: { family: '"Space Grotesk", sans-serif', weight: '600', size: 11 }, color: '#000' },
-        grid: { color: 'rgba(0, 0, 0, 0.1)' },
-      },
-    },
-  }), []);
+    }),
+    []
+  );
 
-  // Prepare derived data with safe defaults
   const categoryDist = analysisData?.category_distribution || {};
   const sourceDist = analysisData?.source_distribution || {};
   const availableCategories = analysisData?.available_categories || [];
   const availableSources = analysisData?.available_sources || [];
 
-  // Inline styles
-  const containerStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    backgroundColor: '#f8f8f8',
-    fontFamily: '"Space Grotesk", sans-serif',
-  };
-
-  const contentStyle = {
-    flex: 1,
-    overflowY: 'auto',
-    padding: '24px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px',
-  };
-
-  const headerStyle = {
-    borderBottom: '3px solid #000',
-    paddingBottom: '16px',
-  };
-
-  const titleStyle = {
-    fontSize: '24px',
-    fontWeight: '900',
-    margin: 0,
-    marginBottom: '4px',
-    letterSpacing: '-1px',
-  };
-
-  const subtitleStyle = {
-    fontSize: '12px',
-    fontWeight: '600',
-    opacity: 0.6,
-    margin: 0,
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-  };
-
-  const loadingStyle = {
-    padding: '40px',
-    textAlign: 'center',
-    color: '#000',
-    fontSize: '16px',
-    fontWeight: '600',
-    backgroundColor: '#fff',
-    border: '2px solid #000',
-  };
-
-  const errorStyle = {
-    padding: '16px',
-    backgroundColor: '#fff',
-    border: '3px solid #000',
-    color: '#c00',
-    fontWeight: '600',
-    fontSize: '14px',
-  };
-
-  // Loading state
   if (loading) {
     return (
-      <div style={containerStyle}>
-        <div style={contentStyle}>
-          <div style={loadingStyle}>⏳ Loading analytics...</div>
+      <div className="app-shell min-h-screen p-4 sm:p-5 lg:p-6">
+        <div className="intel-card mx-auto max-w-6xl p-10 text-center text-base font-semibold">
+          Loading analytics...
         </div>
       </div>
     );
   }
 
-  // Error state
   if (error) {
     return (
-      <div style={containerStyle}>
-        <div style={contentStyle}>
-          <div style={errorStyle}>❌ Error: {error}</div>
+      <div className="app-shell min-h-screen p-4 sm:p-5 lg:p-6">
+        <div className="intel-card mx-auto max-w-6xl border-red-400 p-6 text-sm font-semibold text-red-700">
+          Error: {error}
         </div>
       </div>
     );
   }
 
-  // No data state
   if (!analysisData) {
     return (
-      <div style={containerStyle}>
-        <div style={contentStyle}>
-          <div style={errorStyle}>❌ No data available</div>
+      <div className="app-shell min-h-screen p-4 sm:p-5 lg:p-6">
+        <div className="intel-card mx-auto max-w-6xl p-6 text-sm font-semibold text-zinc-700">
+          No data available
         </div>
       </div>
     );
   }
 
   return (
-    <div style={containerStyle}>
-      <div style={contentStyle}>
-        {/* Header */}
-        <div style={headerStyle}>
-          <h1 style={titleStyle}>◒ ANALYTICS</h1>
-          <p style={subtitleStyle}>Real-time article data & trends</p>
+    <div className="app-shell min-h-screen p-4 sm:p-5 lg:p-6">
+      <div className="mx-auto flex max-w-6xl flex-col gap-5">
+        <div className="intel-card grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_220px] lg:p-6">
+          <div>
+            <p className="intel-kicker mb-3">Real-time article intelligence</p>
+            <h1 className="intel-panel-title">ANALYTICS</h1>
+            <p className="mt-3 max-w-3xl text-sm font-medium leading-7 text-zinc-600">
+              Track source coverage, article volume, topic distribution, and date range trends in the same INTEL_CORE visual system.
+            </p>
+          </div>
+
+          <div className="border-2 border-black bg-zinc-950 p-4 text-white">
+            <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-white/70">
+              Snapshot
+            </div>
+            <div className="mt-4 text-3xl font-black">
+              {(analysisData?.total_articles || 0).toLocaleString()}
+            </div>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
+              indexed articles
+            </p>
+          </div>
         </div>
 
-        {/* Filters */}
         <FilterPanel
           dateFrom={dateFrom}
           onDateFromChange={setDateFrom}
@@ -203,17 +154,14 @@ export default function AnalysisPage() {
           availableSources={availableSources}
         />
 
-        {/* Key Metrics */}
         <MetricsSection
           analysisData={analysisData}
           categoryDist={categoryDist}
           sourceDist={sourceDist}
         />
 
-        {/* Charts */}
         <ChartsSection analysisData={analysisData} chartOptions={chartOptions} />
       </div>
     </div>
   );
 }
-

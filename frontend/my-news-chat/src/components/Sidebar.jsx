@@ -4,7 +4,14 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
  * Sidebar Component - Navigation and layout sidebar
  * Handles menu items, collapse toggle, and logout
  */
-export default function Sidebar({ onLogout, isCollapsed, setIsCollapsed }) {
+export default function Sidebar({
+  onLogout,
+  isCollapsed,
+  setIsCollapsed,
+  isMobileOpen,
+  onMobileClose,
+  onNavigate,
+}) {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -15,117 +22,75 @@ export default function Sidebar({ onLogout, isCollapsed, setIsCollapsed }) {
     { name: "SETTINGS", path: "/settings", icon: "::" },
   ];
 
-  const sidebarStyle = {
-    width: isCollapsed ? "80px" : "260px",
-    height: "100vh",
-    flexShrink: 0,
-    borderRight: "4px solid #000",
-    backgroundColor: "#eee",
-    display: "flex",
-    flexDirection: "column",
-    transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-    fontFamily: '"Space Grotesk", sans-serif',
-    overflow: "hidden",
-    position: "fixed",
-    top: 0,
-    left: 0,
-    zIndex: 1000,
-  };
-
-  const headerStyle = {
-    padding: isCollapsed ? "24px 0" : "24px",
-    borderBottom: "2px solid #000",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: isCollapsed ? "center" : "flex-start",
-    minHeight: "100px",
-  };
-
-  const toggleButtonStyle = {
-    position: "absolute",
-    top: "24px",
-    right: isCollapsed ? "calc(50% - 12px)" : "16px",
-    background: "none",
-    border: "2px solid #000",
-    cursor: "pointer",
-    fontWeight: "900",
-    width: "24px",
-    height: "24px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#fff",
-    zIndex: 10,
-  };
-
   const handleLogout = () => {
     onLogout();
+    onMobileClose?.();
     navigate("/login");
   };
 
   return (
-    <aside style={sidebarStyle}>
-      <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        style={toggleButtonStyle}
-        title={isCollapsed ? "Expand" : "Collapse"}
-      >
-        {isCollapsed ? ">>" : "<<"}
-      </button>
+    <aside
+      className={`fixed inset-y-0 left-0 z-40 flex h-screen flex-col overflow-hidden border-r-4 border-black bg-[#efefef]/95 shadow-[14px_0_40px_rgba(0,0,0,0.06)] backdrop-blur transition-all duration-300 ${
+        isCollapsed ? "lg:w-20" : "lg:w-[16.25rem]"
+      } w-[18rem] ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
+    >
+      <div className={`relative border-b-2 border-black ${isCollapsed ? "px-3 py-6 lg:px-0" : "px-6 py-6"}`}>
+        <button
+          type="button"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          title={isCollapsed ? "Expand" : "Collapse"}
+          className={`absolute top-5 hidden h-8 w-8 items-center justify-center border-2 border-black bg-white text-sm font-black transition hover:-translate-y-0.5 lg:flex ${
+            isCollapsed ? "left-1/2 -translate-x-1/2" : "right-4"
+          }`}
+        >
+          {isCollapsed ? ">>" : "<<"}
+        </button>
 
-      <div style={headerStyle}>
+        <button
+          type="button"
+          onClick={onMobileClose}
+          className="absolute right-4 top-5 inline-flex h-8 w-8 items-center justify-center border-2 border-black bg-white text-sm font-black transition hover:-translate-y-0.5 lg:hidden"
+        >
+          X
+        </button>
+
         {!isCollapsed ? (
-          <>
-            <h2
-              style={{
-                fontSize: "20px",
-                fontWeight: "900",
-                margin: 0,
-                letterSpacing: "-1px",
-              }}
-            >
+          <div className="pr-10">
+            <p className="intel-kicker mb-3">Monitor active</p>
+            <h2 className="text-[1.35rem] font-black tracking-[-0.08em] text-zinc-950">
               INTEL_CORE
             </h2>
-            <div
-              style={{
-                fontSize: "10px",
-                fontWeight: "bold",
-                opacity: 0.6,
-                marginTop: "4px",
-              }}
-            >
-              STATUS: OPTIMAL
-            </div>
-          </>
+            <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+              Status: Optimal
+            </p>
+          </div>
         ) : (
-          <div style={{ fontWeight: "900", fontSize: "20px" }}>I_C</div>
+          <div className="hidden items-center justify-center lg:flex">
+            <span className="text-xl font-black tracking-[-0.08em] text-zinc-950">I_C</span>
+          </div>
         )}
       </div>
 
-      <nav style={{ flex: 1, padding: "12px 0" }}>
+      <nav className="flex-1 space-y-1 px-3 py-4">
         {menuItems.map((item) => {
           const isActive = location.pathname === item.path;
           return (
             <Link
               key={item.name}
               to={item.path}
-              style={{ textDecoration: "none", color: isActive ? "#fff" : "#000" }}
+              onClick={onNavigate}
+              className="block no-underline"
             >
               <div
-                style={{
-                  padding: isCollapsed ? "16px 0" : "16px 24px",
-                  fontWeight: "900",
-                  fontSize: "14px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: isCollapsed ? "center" : "flex-start",
-                  gap: "12px",
-                  backgroundColor: isActive ? "#000" : "transparent",
-                  borderBottom: "1px solid rgba(0,0,0,0.1)",
-                  transition: "all 0.2s",
-                }}
+                className={`flex items-center gap-3 rounded-2xl border px-4 py-4 text-sm font-black tracking-[0.12em] transition ${
+                  isCollapsed ? "justify-center lg:px-0" : "justify-start"
+                } ${
+                  isActive
+                    ? "border-black bg-zinc-950 text-white shadow-[0_14px_30px_rgba(17,17,17,0.18)]"
+                    : "border-transparent text-zinc-900 hover:border-black/10 hover:bg-white/70"
+                }`}
               >
-                <span style={{ fontSize: "20px" }}>{item.icon}</span>
+                <span className="text-lg">{item.icon}</span>
                 {!isCollapsed && <span>{item.name}</span>}
               </div>
             </Link>
@@ -133,23 +98,19 @@ export default function Sidebar({ onLogout, isCollapsed, setIsCollapsed }) {
         })}
       </nav>
 
-      <div style={{ padding: "24px", borderTop: "2px solid #000" }}>
+      <div className="border-t-2 border-black p-5">
+        {!isCollapsed && (
+          <div className="mb-4 rounded-2xl border border-black/10 bg-white/70 p-4">
+            <p className="intel-kicker mb-2">Workspace</p>
+            <p className="text-sm font-semibold leading-6 text-zinc-700">
+              Chat, analytics, archive, and controls in one newsroom-style console.
+            </p>
+          </div>
+        )}
         <button
+          type="button"
           onClick={handleLogout}
-          style={{
-            width: "100%",
-            padding: "12px",
-            backgroundColor: "transparent",
-            border: "2px solid #000",
-            fontWeight: "900",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "8px",
-            boxShadow: "4px 4px 0px #000",
-            transform: "translate(-2px, -2px)",
-          }}
+          className="intel-button-secondary w-full gap-2 border-black/20 bg-white"
         >
           <span>{"<-"}</span> {!isCollapsed && "LOGOUT"}
         </button>

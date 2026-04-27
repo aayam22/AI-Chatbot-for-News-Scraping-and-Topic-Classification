@@ -1,5 +1,4 @@
 import ImageTooltip from './ImageTooltip';
-import { STYLES } from '../constants/styles';
 
 /**
  * SourceCard Component - Displays individual news source
@@ -9,10 +8,10 @@ export default function SourceCard({ source, onImageClick }) {
   if (!source) return null;
 
   return (
-    <div style={STYLES.SOURCE_CONTAINER}>
-      <div style={STYLES.SOURCE_TEXT}>
-        <div style={STYLES.SOURCE_CATEGORY}>{source.category}</div>
-        <div style={STYLES.SOURCE_TITLE}>{source.title}</div>
+    <div className="flex flex-col gap-4 rounded-[1.15rem] border border-black/8 bg-zinc-100/90 p-4 sm:flex-row sm:items-stretch sm:justify-between">
+      <div className="grid flex-1 gap-2">
+        <div className="intel-chip w-fit">{source.category}</div>
+        <div className="text-sm font-bold leading-6 text-zinc-900">{source.title}</div>
       </div>
 
       {source.image_url && (
@@ -21,7 +20,7 @@ export default function SourceCard({ source, onImageClick }) {
             src={source.image_url}
             alt={source.title}
             onClick={() => onImageClick(source.image_url)}
-            style={STYLES.SOURCE_IMAGE}
+            className="h-[88px] w-full cursor-pointer rounded-2xl border border-black/8 object-cover sm:w-[88px]"
           />
         </ImageTooltip>
       )}

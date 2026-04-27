@@ -1,26 +1,15 @@
 const ArchiveEmptyState = ({ error, searchTerm }) => {
-  const emptyStateStyle = {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100%',
-    opacity: 0.6,
-  };
-
   if (error) {
     return (
-      <div style={{ ...emptyStateStyle, color: '#ff6b6b' }}>
-        <p style={{ fontSize: '16px', fontWeight: 'bold' }}>{error}</p>
+      <div className="flex min-h-[24rem] items-center justify-center rounded-[1.5rem] border border-red-200 bg-red-50 px-6 text-center text-base font-bold text-red-700">
+        <p>{error}</p>
       </div>
     );
   }
 
   return (
-    <div style={emptyStateStyle}>
-      <p style={{ fontSize: '16px', fontWeight: 'bold' }}>
-        {searchTerm ? 'No matching conversations' : 'No chat history yet'}
-      </p>
+    <div className="flex min-h-[24rem] items-center justify-center rounded-[1.5rem] border border-dashed border-black/20 bg-white/70 px-6 text-center text-base font-bold text-zinc-500">
+      <p>{searchTerm ? "No matching conversations" : "No chat history yet"}</p>
     </div>
   );
 };

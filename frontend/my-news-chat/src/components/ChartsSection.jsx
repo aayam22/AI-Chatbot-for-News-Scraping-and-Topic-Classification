@@ -1,17 +1,12 @@
-import PropTypes from 'prop-types';
-import { useMemo } from 'react';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
+import PropTypes from "prop-types";
+import { useMemo } from "react";
+import { Bar, Doughnut, Line } from "react-chartjs-2";
 
-/**
- * ChartsSection - Displays analytics charts
- * Uses useMemo to optimize chart data recalculation
- */
 function ChartsSection({ analysisData, chartOptions }) {
   const timeSeriesData = analysisData?.time_series;
   const topCategories = analysisData?.top_categories;
   const topSources = analysisData?.top_sources;
 
-  // Memoize chart data to prevent unnecessary recalculations
   const lineChartData = useMemo(() => {
     const safeTimeSeriesData = timeSeriesData ?? {};
     const timeSeriesDates = Object.keys(safeTimeSeriesData);
@@ -21,14 +16,14 @@ function ChartsSection({ analysisData, chartOptions }) {
       labels: timeSeriesDates,
       datasets: [
         {
-          label: 'Articles Over Time',
+          label: "Articles Over Time",
           data: timeSeriesCounts,
-          borderColor: '#000',
-          backgroundColor: 'rgba(0, 0, 0, 0.05)',
+          borderColor: "#000",
+          backgroundColor: "rgba(0, 0, 0, 0.05)",
           fill: true,
           tension: 0.4,
-          pointBackgroundColor: '#000',
-          pointBorderColor: '#fff',
+          pointBackgroundColor: "#000",
+          pointBorderColor: "#fff",
           pointBorderWidth: 2,
           pointRadius: 4,
           pointHoverRadius: 6,
@@ -44,16 +39,16 @@ function ChartsSection({ analysisData, chartOptions }) {
       labels: safeTopCategories.map((category) => category.name),
       datasets: [
         {
-          label: 'Articles by Predicted Topic',
+          label: "Articles by Predicted Topic",
           data: safeTopCategories.map((category) => category.count),
           backgroundColor: [
-            'rgba(0, 0, 0, 0.9)',
-            'rgba(0, 0, 0, 0.75)',
-            'rgba(0, 0, 0, 0.6)',
-            'rgba(0, 0, 0, 0.45)',
-            'rgba(0, 0, 0, 0.3)',
+            "rgba(0, 0, 0, 0.9)",
+            "rgba(0, 0, 0, 0.75)",
+            "rgba(0, 0, 0, 0.6)",
+            "rgba(0, 0, 0, 0.45)",
+            "rgba(0, 0, 0, 0.3)",
           ],
-          borderColor: '#000',
+          borderColor: "#000",
           borderWidth: 2,
         },
       ],
@@ -67,10 +62,10 @@ function ChartsSection({ analysisData, chartOptions }) {
       labels: safeTopSources.slice(0, 5).map((source) => source.name),
       datasets: [
         {
-          label: 'Top Sources',
+          label: "Top Sources",
           data: safeTopSources.slice(0, 5).map((source) => source.count),
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          borderColor: '#000',
+          backgroundColor: "rgba(0, 0, 0, 0.7)",
+          borderColor: "#000",
           borderWidth: 2,
         },
       ],
@@ -85,60 +80,29 @@ function ChartsSection({ analysisData, chartOptions }) {
     safeTopCategories.length > 0 ||
     safeTopSources.length > 0;
 
-  const chartsGridStyle = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
-    gap: '16px',
-  };
-
-  const chartCardStyle = {
-    padding: '20px',
-    backgroundColor: '#fff',
-    border: '3px solid #000',
-    boxShadow: '3px 3px 0px rgba(0, 0, 0, 0.1)',
-  };
-
-  const chartTitleStyle = {
-    fontSize: '14px',
-    fontWeight: '900',
-    marginBottom: '16px',
-    color: '#000',
-    letterSpacing: '-0.5px',
-    textTransform: 'uppercase',
-    borderBottom: '2px solid #000',
-    paddingBottom: '8px',
-  };
-
-  const noDataStyle = {
-    gridColumn: '1 / -1',
-    padding: '32px',
-    textAlign: 'center',
-    color: '#999',
-    backgroundColor: '#fff',
-    border: '2px solid #ddd',
-    fontSize: '14px',
-    fontWeight: '600',
-  };
-
   return (
-    <div style={chartsGridStyle}>
+    <div className="grid gap-4 xl:grid-cols-2">
       {timeSeriesDates.length > 0 && (
-        <div style={chartCardStyle}>
-          <h3 style={chartTitleStyle}>Articles Over Time</h3>
+        <div className="intel-card p-5">
+          <h3 className="mb-4 border-b-2 border-black pb-2 text-sm font-black uppercase tracking-[0.08em] text-zinc-950">
+            Articles Over Time
+          </h3>
           <Line data={lineChartData} options={chartOptions} />
         </div>
       )}
 
       {safeTopCategories.length > 0 && (
-        <div style={chartCardStyle}>
-          <h3 style={chartTitleStyle}>Top Predicted Topics</h3>
+        <div className="intel-card p-5">
+          <h3 className="mb-4 border-b-2 border-black pb-2 text-sm font-black uppercase tracking-[0.08em] text-zinc-950">
+            Top Predicted Topics
+          </h3>
           <Doughnut
             data={categoryChartData}
             options={{
               ...chartOptions,
               plugins: {
                 ...chartOptions.plugins,
-                legend: { ...chartOptions.plugins.legend, position: 'bottom' },
+                legend: { ...chartOptions.plugins.legend, position: "bottom" },
               },
             }}
           />
@@ -146,14 +110,16 @@ function ChartsSection({ analysisData, chartOptions }) {
       )}
 
       {safeTopSources.length > 0 && (
-        <div style={chartCardStyle}>
-          <h3 style={chartTitleStyle}>Top News Sources</h3>
+        <div className="intel-card p-5">
+          <h3 className="mb-4 border-b-2 border-black pb-2 text-sm font-black uppercase tracking-[0.08em] text-zinc-950">
+            Top News Sources
+          </h3>
           <Bar data={sourceChartData} options={chartOptions} />
         </div>
       )}
 
       {!hasData && (
-        <div style={noDataStyle}>
+        <div className="intel-card col-span-full p-8 text-center text-sm font-semibold text-zinc-500">
           No data available for the selected filters
         </div>
       )}

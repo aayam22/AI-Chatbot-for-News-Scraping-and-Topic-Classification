@@ -1,78 +1,115 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-html,
-body,
-#root {
-  min-height: 100%;
-}
-
-body {
-  background: #ececec;
-  color: #111827;
-  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-button,
-input,
-textarea {
-  font: inherit;
-}
-
-textarea:focus,
-input:focus,
-button:focus {
-  outline: none;
-}
-
-textarea:focus,
-input:focus {
-  border-color: #111 !important;
-  box-shadow: 0 0 0 4px rgba(17, 17, 17, 0.08);
-}
-
-button:disabled,
-input:disabled,
-textarea:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-*::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-*::-webkit-scrollbar-thumb {
-  background: rgba(17, 17, 17, 0.22);
-  border-radius: 999px;
-}
-
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-@media (max-width: 900px) {
-  .chat-header {
-    padding: 18px !important;
+@layer base {
+  * {
+    @apply box-border;
   }
-}
 
-@media (max-width: 720px) {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
   body {
-    font-size: 15px;
+    @apply font-sans text-zinc-900 antialiased;
+    background:
+      radial-gradient(circle at top left, rgba(255, 255, 255, 0.96), rgba(238, 238, 238, 0.9) 34%, rgba(230, 230, 230, 0.82) 100%);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  .chat-header {
-    box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.08) !important;
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  button:disabled,
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgba(17, 17, 17, 0.22);
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  .app-shell {
+    @apply min-h-screen text-zinc-900;
+    background:
+      radial-gradient(circle at top left, rgba(255, 255, 255, 0.96), rgba(238, 238, 238, 0.9) 34%, rgba(230, 230, 230, 0.82) 100%);
+  }
+
+  .intel-card {
+    @apply border-2 border-black/90 backdrop-blur-sm;
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.08);
+  }
+
+  .intel-card-soft {
+    @apply border border-black/10 backdrop-blur-sm;
+    border-radius: 1.5rem;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  }
+
+  .intel-kicker {
+    @apply text-[11px] font-extrabold uppercase tracking-[0.16em] text-zinc-500;
+  }
+
+  .intel-panel-title {
+    @apply font-black uppercase text-zinc-950;
+    font-size: clamp(1.9rem, 3vw, 3rem);
+    letter-spacing: -0.06em;
+  }
+
+  .intel-button {
+    @apply inline-flex items-center justify-center border-2 border-black bg-zinc-950 px-4 py-3 text-xs font-extrabold uppercase text-white transition hover:-translate-y-0.5 hover:bg-black focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-black/10;
+    border-radius: 1rem;
+    letter-spacing: 0.14em;
+    box-shadow: 0 14px 30px rgba(17, 17, 17, 0.18);
+  }
+
+  .intel-button-secondary {
+    @apply inline-flex items-center justify-center border-2 border-black/10 bg-zinc-100 px-4 py-3 text-xs font-extrabold uppercase text-zinc-900 transition hover:-translate-y-0.5 hover:bg-zinc-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-black/10;
+    border-radius: 1rem;
+    letter-spacing: 0.14em;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .intel-input {
+    @apply w-full border-2 border-black/15 bg-white px-4 py-3 text-sm text-zinc-900 transition placeholder:text-zinc-400 focus:border-black focus:outline-none focus:ring-4 focus:ring-black/5;
+    border-radius: 1rem;
+  }
+
+  .intel-select {
+    @apply w-full appearance-none border-2 border-black/15 bg-white px-4 py-3 text-sm text-zinc-900 transition focus:border-black focus:outline-none focus:ring-4 focus:ring-black/5;
+    border-radius: 1rem;
+  }
+
+  .intel-chip {
+    @apply inline-flex items-center rounded-full bg-zinc-950 px-3 py-1.5 text-white;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
   }
 }

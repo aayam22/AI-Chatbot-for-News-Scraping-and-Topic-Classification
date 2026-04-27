@@ -1,6 +1,5 @@
 import LoadingDots from './LoadingDots';
 import SourceCard from './SourceCard';
-import { STYLES } from '../constants/styles';
 import { UI_MESSAGES } from '../constants/messages';
 
 function renderInlineSegments(text) {
@@ -24,15 +23,15 @@ function renderFormattedText(text) {
   return normalized.map((line, index) => {
     if (line.startsWith('- ')) {
       return (
-        <div key={`line-${index}`} style={STYLES.MESSAGE_BULLET}>
-          <span style={STYLES.MESSAGE_BULLET_DOT}>-</span>
+        <div key={`line-${index}`} className="grid grid-cols-[14px_1fr] gap-3">
+          <span className="font-black">-</span>
           <span>{renderInlineSegments(line.slice(2))}</span>
         </div>
       );
     }
 
     return (
-      <p key={`line-${index}`} style={STYLES.MESSAGE_PARAGRAPH}>
+      <p key={`line-${index}`} className="m-0">
         {renderInlineSegments(line)}
       </p>
     );
@@ -45,24 +44,35 @@ function renderFormattedText(text) {
  */
 export default function ChatMessage({ message, onImageClick }) {
   const { role, text, loading, sources, time } = message;
+  const isUser = role === 'user';
 
   return (
-    <div style={STYLES.MESSAGE_WRAPPER(role)}>
-      <div style={STYLES.MESSAGE_BOX(role)}>
-        <div style={STYLES.MESSAGE_META(role)}>
-          <span style={STYLES.MESSAGE_ROLE}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`w-full max-w-[840px] rounded-[1.5rem] px-5 py-5 sm:px-6 ${
+          isUser
+            ? 'border-2 border-black bg-[linear-gradient(135deg,#111,#242424)] text-white shadow-[0_18px_40px_rgba(0,0,0,0.16)]'
+            : 'border border-black/12 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(246,246,246,0.92))] text-zinc-950 shadow-[0_18px_40px_rgba(15,23,42,0.08)]'
+        }`}
+      >
+        <div
+          className={`mb-3 flex flex-wrap items-center justify-between gap-3 text-[11px] font-extrabold uppercase tracking-[0.14em] ${
+            isUser ? 'text-white/70' : 'text-zinc-500'
+          }`}
+        >
+          <span className="inline-flex items-center gap-2">
             <span>{role === 'user' ? 'User Query' : 'News Brief'}</span>
           </span>
           <span>{time || 'Live'}</span>
         </div>
 
-        <div style={STYLES.MESSAGE_TEXT}>
+        <div className="grid gap-3 text-[15px] leading-7">
           {loading ? <LoadingDots text={UI_MESSAGES.GENERATING_ANSWER} /> : renderFormattedText(text)}
         </div>
 
         {sources?.length > 0 && (
-          <div style={STYLES.SOURCES_SECTION}>
-            <div style={STYLES.SOURCES_HEADER}>
+          <div className="mt-5 grid gap-3 border-t border-zinc-400/25 pt-4">
+            <div className={`text-xs font-bold uppercase tracking-[0.12em] ${isUser ? 'text-white/70' : 'text-zinc-500'}`}>
               {UI_MESSAGES.SOURCES_COUNT(sources.length)}
             </div>
 

@@ -1,39 +1,30 @@
-import PropTypes from 'prop-types';
-import MetricCard from './MetricCard';
+import PropTypes from "prop-types";
+import MetricCard from "./MetricCard";
 
-/**
- * MetricsSection - Displays key metrics in a grid
- */
 function MetricsSection({ analysisData, categoryDist, sourceDist }) {
-  const metricsGridStyle = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-    gap: '12px',
-  };
-
   return (
-    <div style={metricsGridStyle}>
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       <MetricCard
         label="Total Articles"
         value={(analysisData?.total_articles || 0).toLocaleString()}
-        icon="📰"
+        icon="VOL"
       />
       <MetricCard
         label="Predicted Topics"
         value={Object.keys(categoryDist).length || 0}
-        icon="🎯"
+        icon="TOP"
       />
       <MetricCard
         label="Sources"
         value={Object.keys(sourceDist).length || 0}
-        icon="📡"
+        icon="SRC"
       />
       <MetricCard
         label="Date Range"
-        value={`${analysisData?.date_range?.from?.substring(5) || 'N/A'} - ${
-          analysisData?.date_range?.to?.substring(5) || 'N/A'
+        value={`${analysisData?.date_range?.from?.substring(5) || "N/A"} - ${
+          analysisData?.date_range?.to?.substring(5) || "N/A"
         }`}
-        icon="📅"
+        icon="RNG"
       />
     </div>
   );

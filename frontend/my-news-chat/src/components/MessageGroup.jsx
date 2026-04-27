@@ -1,24 +1,11 @@
-import ConversationItem from './ConversationItem';
+import ConversationItem from "./ConversationItem";
 
 const MessageGroup = ({ date, conversations, onExpandMessage }) => {
-  const dateGroupStyle = {
-    marginBottom: '32px',
-  };
-
-  const dateHeaderStyle = {
-    fontSize: '14px',
-    fontWeight: '900',
-    color: '#000',
-    marginBottom: '16px',
-    paddingBottom: '8px',
-    borderBottom: '2px solid #000',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-  };
-
   return (
-    <div style={dateGroupStyle}>
-      <div style={dateHeaderStyle}>{date}</div>
+    <div className="mb-8">
+      <div className="mb-4 border-b-2 border-black pb-2 text-sm font-black uppercase tracking-[0.12em] text-zinc-950">
+        {date}
+      </div>
       {conversations.map((conversation) => (
         <ConversationItem
           key={conversation.id}

@@ -2,7 +2,6 @@ import { useState } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
 import { API_CONFIG } from '../constants/config';
-import styles from './LoginPage.module.css';
 
 /**
  * LoginPage Component - User authentication page
@@ -44,20 +43,25 @@ export default function LoginPage({ setToken }) {
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.card}>
-        <h1 className={styles.header}>INTEL_CORE</h1>
-        <p className={styles.subtitle}>Authentication</p>
+    <div className="app-shell flex min-h-screen items-center justify-center px-4 py-8">
+      <div className="intel-card w-full max-w-md p-6 sm:p-8">
+        <p className="intel-kicker mb-3">Access terminal</p>
+        <h1 className="text-[2.2rem] font-black tracking-[-0.08em] text-zinc-950">INTEL_CORE</h1>
+        <p className="mt-2 text-sm font-medium text-zinc-600">Authentication</p>
 
-        {error && <div className={styles.error}>{error}</div>}
+        {error && (
+          <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            {error}
+          </div>
+        )}
 
-        <form className={styles.form} onSubmit={handleSubmit}>
+        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           <input
             placeholder="USERNAME"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             disabled={isLoading}
-            className={styles.input}
+            className="intel-input"
             required
           />
           <input
@@ -66,23 +70,23 @@ export default function LoginPage({ setToken }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={isLoading}
-            className={styles.input}
+            className="intel-input"
             required
           />
           <button
             type="submit"
             disabled={isLoading}
-            className={styles.button}
+            className="intel-button w-full"
           >
             {isLoading ? "AUTHENTICATING..." : "SIGN IN"}
           </button>
         </form>
 
-        <div className={styles.footer}>
+        <div className="mt-6 text-sm font-medium text-zinc-600">
           Don't have an account?{" "}
           <Link
             to="/register"
-            className={styles.link}
+            className="font-bold text-zinc-950 underline decoration-black/30 underline-offset-4 transition hover:decoration-black"
           >
             Register
           </Link>

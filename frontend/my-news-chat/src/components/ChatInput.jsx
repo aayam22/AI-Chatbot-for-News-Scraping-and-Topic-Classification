@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { STYLES } from '../constants/styles';
 import { BUTTON_LABELS, PLACEHOLDERS } from '../constants/messages';
 
 /**
@@ -24,13 +23,13 @@ export default function ChatInput({ onSend, onClear, disabled }) {
   };
 
   return (
-    <div style={STYLES.INPUT_CONTAINER}>
-      <div style={STYLES.INPUT_FIELD_WRAP}>
-        <div style={STYLES.INPUT_LABEL_ROW}>
-          <label htmlFor="chat-input" style={STYLES.INPUT_LABEL}>
+    <div className="intel-card flex flex-wrap items-end gap-3 p-3 sm:p-4">
+      <div className="min-w-[16rem] flex-1">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+          <label htmlFor="chat-input" className="intel-kicker">
             Query Console
           </label>
-          <span style={STYLES.INPUT_HINT}>Press Enter to send</span>
+          <span className="text-xs font-medium text-zinc-500">Press Enter to send</span>
         </div>
 
         <textarea
@@ -40,17 +39,17 @@ export default function ChatInput({ onSend, onClear, disabled }) {
           onKeyDown={handleKeyDown}
           placeholder={PLACEHOLDERS.CHAT_INPUT}
           disabled={disabled}
-          style={STYLES.INPUT_FIELD}
+          className="intel-input min-h-[56px] resize-none rounded-[1.1rem]"
           rows={1}
         />
       </div>
 
-      <div style={STYLES.BUTTON_GROUP}>
+      <div className="flex w-full flex-wrap gap-3 sm:w-auto">
         <button
           type="button"
           onClick={handleSubmit}
           disabled={disabled || !question.trim()}
-          style={STYLES.BUTTON('primary')}
+          className="intel-button min-w-[120px] flex-1 sm:flex-none"
         >
           {BUTTON_LABELS.SEND}
         </button>
@@ -59,7 +58,7 @@ export default function ChatInput({ onSend, onClear, disabled }) {
           type="button"
           onClick={onClear}
           disabled={disabled}
-          style={STYLES.BUTTON('secondary')}
+          className="intel-button-secondary min-w-[120px] flex-1 sm:flex-none"
         >
           {BUTTON_LABELS.CLEAR}
         </button>

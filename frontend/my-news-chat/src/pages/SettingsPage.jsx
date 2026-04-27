@@ -1,22 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { getPipelineStatus, runPipeline } from "../services/pipelineService";
 
-const PAGE_STYLE = {
-  minHeight: "100vh",
-  background:
-    "linear-gradient(135deg, #f7f1e7 0%, #e6ddd0 45%, #d6cab8 100%)",
-  color: "#151515",
-  padding: "32px",
-  fontFamily: '"Space Grotesk", sans-serif',
-};
-
-const PANEL_STYLE = {
-  backgroundColor: "rgba(255, 255, 255, 0.84)",
-  border: "3px solid #111",
-  boxShadow: "8px 8px 0 #111",
-  padding: "24px",
-};
-
 const LABELS = {
   idle: "Idle",
   running: "Running",
@@ -132,89 +116,25 @@ export default function SettingsPage({ token }) {
     "No pipeline logs yet. Start a run to capture output here.";
 
   return (
-    <main style={PAGE_STYLE}>
-      <div
-        style={{
-          maxWidth: "1080px",
-          margin: "0 auto",
-          display: "grid",
-          gap: "24px",
-        }}
-      >
-        <section style={PANEL_STYLE}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              gap: "16px",
-              flexWrap: "wrap",
-            }}
-          >
+    <main className="app-shell min-h-screen p-4 sm:p-5 lg:p-6">
+      <div className="mx-auto grid max-w-6xl gap-5">
+        <section className="intel-card p-5 lg:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p
-                style={{
-                  margin: "0 0 8px",
-                  fontSize: "12px",
-                  fontWeight: "700",
-                  letterSpacing: "0.18em",
-                  textTransform: "uppercase",
-                }}
-              >
-                Settings
-              </p>
-              <h1
-                style={{
-                  margin: "0 0 12px",
-                  fontSize: "clamp(2rem, 4vw, 3rem)",
-                  lineHeight: 1,
-                }}
-              >
-                Manual Data Pipeline Trigger
-              </h1>
-              <p
-                style={{
-                  margin: 0,
-                  maxWidth: "700px",
-                  fontSize: "16px",
-                  lineHeight: 1.6,
-                }}
-              >
+              <p className="intel-kicker mb-3">Settings</p>
+              <h1 className="intel-panel-title">Manual Data Pipeline Trigger</h1>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-600">
                 Run the backend news pipeline on demand from the frontend. The
                 full mode includes scraping, while fast mode only refreshes
                 classification and embeddings from existing data.
               </p>
             </div>
 
-            <div
-              style={{
-                minWidth: "180px",
-                padding: "14px 16px",
-                border: "2px solid #111",
-                backgroundColor: "#fff",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "12px",
-                  fontWeight: "700",
-                  letterSpacing: "0.14em",
-                  textTransform: "uppercase",
-                  marginBottom: "10px",
-                }}
-              >
+            <div className="min-w-[180px] border-2 border-black bg-zinc-950 p-4 text-white">
+              <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-white/70">
                 Current Status
               </div>
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  color: statusColor,
-                  fontWeight: "900",
-                  fontSize: "18px",
-                }}
-              >
+              <div className="mt-4 inline-flex items-center gap-3 text-lg font-black" style={{ color: statusColor }}>
                 <span
                   style={{
                     width: "12px",
@@ -230,31 +150,21 @@ export default function SettingsPage({ token }) {
           </div>
         </section>
 
-        <section
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "24px",
-          }}
-        >
-          <div style={PANEL_STYLE}>
-            <h2 style={{ marginTop: 0, marginBottom: "18px", fontSize: "24px" }}>
+        <section className="grid gap-5 xl:grid-cols-2">
+          <div className="intel-card p-5">
+            <h2 className="mb-5 text-2xl font-black tracking-[-0.05em] text-zinc-950">
               Pipeline Controls
             </h2>
 
-            <div style={{ display: "grid", gap: "14px" }}>
+            <div className="grid gap-3">
               {MODE_OPTIONS.map((option) => (
                 <label
                   key={option.value}
-                  style={{
-                    border: "2px solid #111",
-                    padding: "14px 16px",
-                    backgroundColor:
-                      selectedMode === option.value ? "#111" : "#f7f1e7",
-                    color: selectedMode === option.value ? "#fff" : "#111",
-                    cursor: isRunning ? "not-allowed" : "pointer",
-                    opacity: isRunning ? 0.65 : 1,
-                  }}
+                  className={`rounded-[1.2rem] border-2 px-4 py-4 transition ${
+                    selectedMode === option.value
+                      ? "border-black bg-zinc-950 text-white"
+                      : "border-black bg-white text-zinc-900"
+                  } ${isRunning ? "cursor-not-allowed opacity-65" : "cursor-pointer"}`}
                 >
                   <input
                     type="radio"
@@ -263,12 +173,10 @@ export default function SettingsPage({ token }) {
                     checked={selectedMode === option.value}
                     onChange={(event) => setSelectedMode(event.target.value)}
                     disabled={isRunning}
-                    style={{ marginRight: "10px" }}
+                    className="mr-3"
                   />
                   <strong>{option.label}</strong>
-                  <div style={{ marginTop: "6px", fontSize: "14px", lineHeight: 1.5 }}>
-                    {option.description}
-                  </div>
+                  <div className="mt-2 text-sm leading-6">{option.description}</div>
                 </label>
               ))}
             </div>
@@ -277,18 +185,11 @@ export default function SettingsPage({ token }) {
               type="button"
               onClick={handleRunPipeline}
               disabled={isRunning || isSubmitting || isLoading}
-              style={{
-                marginTop: "20px",
-                width: "100%",
-                padding: "16px",
-                border: "2px solid #111",
-                backgroundColor: isRunning ? "#bfb8af" : "#111",
-                color: isRunning ? "#555" : "#fff",
-                fontWeight: "900",
-                fontSize: "15px",
-                cursor: isRunning ? "not-allowed" : "pointer",
-                boxShadow: isRunning ? "none" : "6px 6px 0 #111",
-              }}
+              className={`mt-5 w-full rounded-2xl border-2 border-black px-4 py-4 text-sm font-black uppercase tracking-[0.12em] transition ${
+                isRunning
+                  ? "cursor-not-allowed bg-[#bfb8af] text-zinc-500"
+                  : "bg-zinc-950 text-white shadow-[6px_6px_0_#111] hover:-translate-y-0.5"
+              }`}
             >
               {isSubmitting
                 ? "Starting pipeline..."
@@ -297,102 +198,61 @@ export default function SettingsPage({ token }) {
                   : "Run pipeline now"}
             </button>
 
-            {notice ? (
-              <p style={{ marginTop: "16px", color: "#0f6a3e", fontWeight: "700" }}>
-                {notice}
-              </p>
-            ) : null}
-
-            {error ? (
-              <p style={{ marginTop: "16px", color: "#9a1f19", fontWeight: "700" }}>
-                {error}
-              </p>
-            ) : null}
+            {notice ? <p className="mt-4 text-sm font-bold text-emerald-700">{notice}</p> : null}
+            {error ? <p className="mt-4 text-sm font-bold text-red-700">{error}</p> : null}
           </div>
 
-          <div style={PANEL_STYLE}>
-            <h2 style={{ marginTop: 0, marginBottom: "18px", fontSize: "24px" }}>
+          <div className="intel-card p-5">
+            <h2 className="mb-5 text-2xl font-black tracking-[-0.05em] text-zinc-950">
               Run Details
             </h2>
 
             {isLoading && !pipelineStatus ? (
-              <p style={{ margin: 0 }}>Loading pipeline status...</p>
+              <p className="m-0 text-sm text-zinc-600">Loading pipeline status...</p>
             ) : (
-              <div style={{ display: "grid", gap: "14px" }}>
+              <div className="grid gap-3 text-sm leading-7 text-zinc-700">
                 <div>
                   <strong>Selected mode:</strong> {pipelineStatus?.mode ?? selectedMode}
                 </div>
                 <div>
-                  <strong>Last started:</strong>{" "}
-                  {formatTimestamp(pipelineStatus?.started_at)}
+                  <strong>Last started:</strong> {formatTimestamp(pipelineStatus?.started_at)}
                 </div>
                 <div>
-                  <strong>Last finished:</strong>{" "}
-                  {formatTimestamp(pipelineStatus?.finished_at)}
+                  <strong>Last finished:</strong> {formatTimestamp(pipelineStatus?.finished_at)}
                 </div>
                 <div>
-                  <strong>Triggered by:</strong>{" "}
-                  {pipelineStatus?.last_triggered_by ?? "Not available"}
+                  <strong>Triggered by:</strong> {pipelineStatus?.last_triggered_by ?? "Not available"}
                 </div>
                 <div>
-                  <strong>Exit code:</strong>{" "}
-                  {pipelineStatus?.exit_code ?? "Not available"}
+                  <strong>Exit code:</strong> {pipelineStatus?.exit_code ?? "Not available"}
                 </div>
                 <div>
-                  <strong>Last update:</strong>{" "}
-                  {formatTimestamp(pipelineStatus?.updated_at)}
+                  <strong>Last update:</strong> {formatTimestamp(pipelineStatus?.updated_at)}
                 </div>
               </div>
             )}
           </div>
         </section>
 
-        <section style={PANEL_STYLE}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "12px",
-              flexWrap: "wrap",
-              marginBottom: "16px",
-            }}
-          >
+        <section className="intel-card p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 style={{ margin: "0 0 6px", fontSize: "24px" }}>Pipeline Output</h2>
-              <p style={{ margin: 0, color: "#444", lineHeight: 1.5 }}>
+              <h2 className="mb-1 text-2xl font-black tracking-[-0.05em] text-zinc-950">
+                Pipeline Output
+              </h2>
+              <p className="text-sm leading-6 text-zinc-600">
                 Logs stream here while the pipeline is running. Keep this page
                 open to follow progress in near real time.
               </p>
             </div>
-            <div
-              style={{
-                padding: "8px 12px",
-                border: "2px solid #111",
-                backgroundColor: "#fff",
-                fontWeight: "700",
-              }}
-            >
+            <div className="rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-zinc-700">
               Refresh: every 1 second
             </div>
           </div>
 
           <pre
             ref={outputRef}
-            style={{
-              margin: 0,
-              padding: "18px",
-              minHeight: "280px",
-              maxHeight: "420px",
-              overflow: "auto",
-              backgroundColor: "#111",
-              color: "#f7f1e7",
-              border: "2px solid #111",
-              fontSize: "13px",
-              lineHeight: 1.6,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
+            className="m-0 min-h-[280px] max-h-[420px] overflow-auto border-2 border-black bg-zinc-950 p-5 text-[13px] leading-7 whitespace-pre-wrap break-words text-[#f7f1e7]"
           >
             {outputText}
           </pre>

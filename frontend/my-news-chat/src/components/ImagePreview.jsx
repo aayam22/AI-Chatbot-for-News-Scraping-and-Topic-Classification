@@ -1,5 +1,3 @@
-import { STYLES } from '../constants/styles';
-
 /**
  * ImagePreview Component - Full-screen image preview modal
  * Closes on click or when previewImage is null
@@ -8,11 +6,14 @@ export default function ImagePreview({ imageUrl, onClose }) {
   if (!imageUrl) return null;
 
   return (
-    <div style={STYLES.PREVIEW_MODAL} onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/75 p-4"
+      onClick={onClose}
+    >
       <img
         src={imageUrl}
         alt="preview"
-        style={STYLES.PREVIEW_IMAGE}
+        className="max-h-[90vh] max-w-[90vw] rounded-2xl shadow-2xl"
       />
     </div>
   );

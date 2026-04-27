@@ -25,39 +25,57 @@ function App() {
     removeMessage,
   } = useChatMessages(token);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const isAuthenticated = Boolean(token);
 
   const handleLogout = useCallback(() => {
     clearAllMessages();
+    setIsMobileSidebarOpen(false);
     logout();
   }, [clearAllMessages, logout]);
 
   return (
     <BrowserRouter>
-      <div style={{ display: "flex", minHeight: "100vh" }}>
+      <div className="app-shell flex min-h-screen">
+        {isAuthenticated && (
+          <div
+            className={`fixed inset-0 z-30 bg-black/35 transition-opacity duration-300 lg:hidden ${
+              isMobileSidebarOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+            }`}
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+        )}
+
         {isAuthenticated && (
           <Sidebar
             onLogout={handleLogout}
             isCollapsed={isCollapsed}
             setIsCollapsed={setIsCollapsed}
+            isMobileOpen={isMobileSidebarOpen}
+            onMobileClose={() => setIsMobileSidebarOpen(false)}
+            onNavigate={() => setIsMobileSidebarOpen(false)}
           />
         )}
+
+        {isAuthenticated && (
+          <button
+            type="button"
+            onClick={() => setIsMobileSidebarOpen((current) => !current)}
+            className="fixed bottom-5 left-5 z-50 rounded-full border-2 border-black bg-white px-4 py-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-zinc-950 shadow-[8px_8px_0_rgba(0,0,0,0.08)] transition hover:-translate-y-0.5 lg:hidden"
+          >
+            {isMobileSidebarOpen ? "Close" : "Menu"}
+          </button>
+        )}
+
         <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "auto",
-            marginLeft: isAuthenticated ? (isCollapsed ? "80px" : "260px") : "0px",
-            transition: "margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-          }}
+          className={`flex min-h-screen flex-1 flex-col overflow-x-hidden transition-[padding] duration-300 ${
+            isAuthenticated ? (isCollapsed ? "lg:pl-20" : "lg:pl-[16.25rem]") : ""
+          }`}
         >
           <Routes>
-            {/* Public Routes */}
             <Route path="/login" element={<LoginPage setToken={setToken} />} />
             <Route path="/register" element={<RegisterPage />} />
 
-            {/* Private Routes */}
             <Route
               path="/"
               element={
@@ -100,6 +118,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/system"
               element={
@@ -109,7 +128,6 @@ function App() {
               }
             />
 
-            {/* Catch-all redirect */}
             <Route
               path="*"
               element={
