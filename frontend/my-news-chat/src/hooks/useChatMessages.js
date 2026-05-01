@@ -18,10 +18,6 @@ function getInitialMessages() {
   }
 }
 
-function getInitialClearedAt() {
-  return localStorage.getItem(STORAGE_KEYS.CHAT_PAGE_CLEARED_AT);
-}
-
 function normalizeServerMessages(messages) {
   return messages.map((message) => ({
     id: message.id,
@@ -31,6 +27,10 @@ function normalizeServerMessages(messages) {
     created_at: message.created_at,
     time: formatMessageTime(message.created_at)
   }));
+}
+
+function getInitialClearedAt() {
+  return localStorage.getItem(STORAGE_KEYS.CHAT_PAGE_CLEARED_AT);
 }
 
 function isMessageVisible(message, clearedAt) {

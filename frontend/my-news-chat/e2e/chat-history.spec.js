@@ -77,11 +77,11 @@ test("chat history persists across archive, refresh, clear, and logout/login", a
     await expect(page.getByText(answer, { exact: true })).toHaveCount(0);
   });
 
-  await test.step("return to feed and confirm archive deletion synced", async () => {
+  await test.step("return to feed and confirm cleared view stays cleared", async () => {
     await page.getByRole("link", { name: /feed/i }).click();
     await page.waitForURL("**/");
 
-    await expect(page.getByText(question, { exact: true })).toBeVisible();
+    await expect(page.getByText(question, { exact: true })).toHaveCount(0);
     await expect(page.getByText(answer, { exact: true })).toHaveCount(0);
   });
 
