@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timedelta
@@ -10,6 +11,10 @@ from jose import jwt
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 import rag_with_sambanova as rag
 from api import app_server
@@ -747,3 +752,7 @@ class PasswordPolicyDocumentedTests(unittest.TestCase):
     def test_tc_41_strong_password_accepted(self):
         errors = validate_password_strength("Tr0ub4dor&3XYZ")
         self.assertEqual(errors, [])
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
