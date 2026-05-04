@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 import sqlite3
 from collections import Counter
 import os
+import re
 import secrets
 import smtplib
 import subprocess
@@ -40,6 +41,21 @@ PROJECT_ROOT = os.path.abspath(os.path.join(API_DIR, ".."))
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 load_dotenv(os.path.join(API_DIR, ".env"))
 
+
+def normalize_smtp_password(value: str | None) -> str | None:
+    """
+    Gmail app passwords are often copied in a grouped display format like
+    "abcd efgh ijkl mnop". Collapse only that specific pattern.
+    """
+    if value is None:
+        return None
+
+    normalized = value.strip()
+    if re.fullmatch(r"(?:[A-Za-z0-9]{4}\s+){3}[A-Za-z0-9]{4}", normalized):
+        return re.sub(r"\s+", "", normalized)
+
+    return normalized
+
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./users.db")
 SECRET_KEY = "super_secret_key_change_this_in_production"
 ALGORITHM = "HS256"
@@ -56,11 +72,11 @@ FRONTEND_ORIGINS = [
     ).split(",")
     if origin.strip()
 ]
-SMTP_HOST = os.getenv("SMTP_HOST")
+SMTP_HOST = (os.getenv("SMTP_HOST") or "").strip() or None
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USERNAME = os.getenv("SMTP_USERNAME")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", SMTP_USERNAME or "no-reply@intel-core.local")
+SMTP_USERNAME = (os.getenv("SMTP_USERNAME") or "").strip() or None
+SMTP_PASSWORD = normalize_smtp_password(os.getenv("SMTP_PASSWORD"))
+SMTP_FROM_EMAIL = (os.getenv("SMTP_FROM_EMAIL", SMTP_USERNAME or "no-reply@intel-core.local") or "").strip()
 SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes", "on"}
 SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "false").lower() in {"1", "true", "yes", "on"}
 PIPELINE_DEFAULT_MODE = "full"
