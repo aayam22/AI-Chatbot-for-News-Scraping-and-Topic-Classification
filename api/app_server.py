@@ -1,6 +1,6 @@
 # app_server_unified_per_user.py
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, or_, Text, JSON, desc, asc
@@ -562,8 +562,6 @@ app.add_middleware(
 # ----------------------------
 @app.post("/register")
 def register(user: RegistrationVerify, db: Session = Depends(get_db)):
-    cleanup_expired_pending_registrations(db)
-
     username = normalize_username(user.username)
     email = normalize_email(user.email)
     otp = user.otp.strip()
@@ -779,11 +777,13 @@ def delete_chat_message(message_id: int, current_user: str = Depends(get_current
         
         if not message:
             raise HTTPException(status_code=404, detail="Message not found")
-        
+
         db.delete(message)
         db.commit()
-        
-        return {"status": "Message deleted", "message_id": message_id}
+
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

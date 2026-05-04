@@ -214,7 +214,7 @@ class ChatHistoryApiTests(unittest.TestCase):
             message_id = message.id
 
         delete_response = client.delete(f"/chat-history/{message_id}")
-        self.assertEqual(delete_response.status_code, 200)
+        self.assertEqual(delete_response.status_code, 204)
 
         history_response = client.get("/chat-history")
         self.assertEqual(history_response.status_code, 200)
